@@ -8,8 +8,8 @@
 #error "Must compile with -fPIE"
 #endif
 
-int(*GX_SetTextureCopy)(void *input_buffer, void *output_buffer, unsigned int size, int in_x, int in_y, int out_x, int out_y, int flags) = 0x0011DD48;
-int(*GSPGPU_FlushDataCache)(void *addr, unsigned int len) = 0x00191504;
+int(*GX_SetTextureCopy)(void *input_buffer, void *output_buffer, unsigned int size, int in_x, int in_y, int out_x, int out_y, int flags) = (void *)0x0011DD48;
+int(*GSPGPU_FlushDataCache)(void *addr, unsigned int len) = (void *)0x00191504;
 int(*svcSleepThread)(unsigned long long nanoseconds) = (void *)0x0023FFE8;
 
 int uvl_entry();
