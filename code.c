@@ -4,23 +4,21 @@
 #define CODE_OFFSET	0x14000000
 #define ARCODE_POS	0x00000004
 
-void ReadMemory(unsigned int Offset);
-void WriteMemory(unsigned int Offset);
 void Write32(unsigned int Offset, unsigned int Data);
 void Write16(unsigned int Offset, unsigned int Data);
 void Write8(unsigned int Offset, unsigned int Data);
 unsigned int Read32(unsigned int Offset);
 
-unsigned int *buf = 0x18410000;
+unsigned int *buf = (unsigned int *)0x18410000;
 
 int uvl_entry()
 {
 	FILE *fin = (void *)0x08F10000;
-	int *read_len = 0x08F10020;
-	int *written = 0x08F01000;
+	int *read_len = (int *)0x08F10020;
+	int *written = (int *)0x08F01000;
 	unsigned int LineCount = 0;
 	unsigned int ProcessedLines = 0;
-	unsigned int Type;
+	unsigned int Type=0;
 	unsigned int First8 = 0;
 	unsigned int Second8 = 0;
 	unsigned int CodeOffset = CODE_OFFSET;
@@ -238,37 +236,27 @@ int uvl_entry()
 	return 0;
 }
 
-void ReadMemory(unsigned int Offset)
-{
-	GSPGPU_FlushDataCache(Offset & 0xFFFFFFF0, 0x20);
-	GX_SetTextureCopy(Offset & 0xFFFFFFF0, buf, 0x20, 0, 0, 0, 0, 8);
-	GSPGPU_FlushDataCache(buf, 0x20);
-	svcSleepThread(0x200000LL);
-}
-
-void WriteMemory(unsigned int Offset)
-{
-	GSPGPU_FlushDataCache(buf, 0x20);
-	GX_SetTextureCopy(buf, Offset & 0xFFFFFFF0, 0x20, 0, 0, 0, 0, 8);
-	GSPGPU_FlushDataCache(Offset & 0xFFFFFFF0, 0x20);
+void CopyMem(void *src, void *dst){
+	GSPGPU_FlushDataCache(src, 0x20);
+	GX_SetTextureCopy(src, dst, 0x20, 0, 0, 0, 0, 8);
+	GSPGPU_FlushDataCache(dst, 0x20);
 	svcSleepThread(0x200000LL);
 }
 
 void Write32(unsigned int Offset, unsigned int Data)
 {
-	ReadMemory(Offset);
+	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
 	unsigned int offs = (Offset & 0x0F) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	unsigned int mask = 0xFFFFFFFF << shift;
 	buf[offs] = (buf[offs] & ~mask) | ((Data << shift ) & mask);
 	buf[offs+1] = (buf[offs+1] & mask) | ((Data >> (0x20 - shift)) & ~mask);
-
-	WriteMemory(Offset);
+	CopyMem(buf, (void *)(Offset & 0xFFFFFFF0));
 }
 
 void Write16(unsigned int Offset, unsigned int Data)
 {
-	ReadMemory(Offset);
+	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
 	Data &= 0x0000FFFF;
 	unsigned int offs = (Offset & 0x0F) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
@@ -276,21 +264,21 @@ void Write16(unsigned int Offset, unsigned int Data)
 	unsigned int mask1 = (mask == 0xFF000000) ? 0x000000FF : 0x00000000;
 	buf[offs] = (buf[offs] & ~mask) | (Data << shift);
 	buf[offs+1] = (buf[offs+1] & ~mask1) | ((Data >> (0x20 - shift)) & mask1);
-	WriteMemory(Offset);
+	CopyMem(buf, (void *)(Offset & 0xFFFFFFF0));
 }
 
 void Write8(unsigned int Offset, unsigned int Data)
 {
-	ReadMemory(Offset);
+	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
 	unsigned int offs = (Offset & 0x0F) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	buf[offs] = (buf[offs] & ~(0x000000FF << shift)) | ((Data & 0x000000FF) << shift);
-	WriteMemory(Offset);
+	CopyMem(buf, (void *)(Offset & 0xFFFFFFF0));
 }
 
 unsigned int Read32(unsigned int Offset)
 {
-	ReadMemory(Offset);
+	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
 	unsigned int offs = (Offset & 0x0F) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	unsigned int mask = 0xFFFFFFFF >> shift;
