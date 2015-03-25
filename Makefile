@@ -6,7 +6,7 @@ LDFLAGS=-T linker.x -nodefaultlibs -nostdlib -pie
 OBJCOPY=arm-none-eabi-objcopy
 OBJCOPYFLAGS=
 
-all: code.bin
+all: code.bin arcode.bin
 
 %.o: %.c
 	$(CC) -c -o $@ $< $(CFLAGS)
