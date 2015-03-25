@@ -11,14 +11,16 @@ void Write16(unsigned int Offset, unsigned int Data);
 void Write8(unsigned int Offset, unsigned int Data);
 unsigned int Read32(unsigned int Offset);
 
+unsigned int *buf = 0x18410000;
+
 int uvl_entry()
 {
 	FILE *fin = (void *)0x08F10000;
-	unsigned int *buf = 0x18410000;
 	int *read_len = 0x08F10020;
 	int *written = 0x08F01000;
 	unsigned int LineCount = 0;
 	unsigned int ProcessedLines = 0;
+	unsigned int Type;
 	unsigned int First8 = 0;
 	unsigned int Second8 = 0;
 	unsigned int CodeOffset = CODE_OFFSET;
@@ -41,8 +43,7 @@ int uvl_entry()
 		Second8 = buf[1];
 		ProcessedLines++;
 		Offset = CodeOffset + (First8 & 0x0FFFFFFF);
-
-		switch (First8 & 0xF0000000)
+		switch (Type = First8 & 0xF0000000)
 		{
 			case 0x00000000://32-bit Write
 				Write32(Offset, Second8);
@@ -54,176 +55,24 @@ int uvl_entry()
 				Write8(Offset, Second8);
 				break;
 			case 0x30000000://32-bit Greater Than
-				if (Second8 <= Read32(Offset))
-				{
-					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
-					{
-						IFile_Read(fin, read_len, buf, 0x08);
-						First8 = buf[0];
-						Second8 = buf[1];
-						ProcessedLines++;
-					}
-
-					if (First8 == 0xD2000000)
-					{
-						if (RepeatCount > 0x00)
-						{
-							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							fin->pos = ARCODE_POS + (ProcessedLines << 3);
-						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
-					}
-				}
-				break;
 			case 0x40000000://32-bit Less Than
-				if (Second8 >= Read32(Offset))
-				{
-					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
-					{
-						IFile_Read(fin, read_len, buf, 0x08);
-						First8 = buf[0];
-						Second8 = buf[1];
-						ProcessedLines++;
-					}
-
-					if (First8 == 0xD2000000)
-					{
-						if (RepeatCount > 0x00)
-						{
-							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							fin->pos = ARCODE_POS + (ProcessedLines << 3);
-						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
-					}
-				}
-				break;
 			case 0x50000000://32-bit Equal To
-				if (Second8 != Read32(Offset))
-				{
-					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
-					{
-						IFile_Read(fin, read_len, buf, 0x08);
-						First8 = buf[0];
-						Second8 = buf[1];
-						ProcessedLines++;
-					}
-
-					if (First8 == 0xD2000000)
-					{
-						if (RepeatCount > 0x00)
-						{
-							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							fin->pos = ARCODE_POS + (ProcessedLines << 3);
-						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
-					}
-				}
-				break;
 			case 0x60000000://32-bit Not Equal To
-				if (Second8 == Read32(Offset))
-				{
-					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
-					{
-						IFile_Read(fin, read_len, buf, 0x08);
-						First8 = buf[0];
-						Second8 = buf[1];
-						ProcessedLines++;
-					}
-
-					if (First8 == 0xD2000000)
-					{
-						if (RepeatCount > 0x00)
-						{
-							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							fin->pos = ARCODE_POS + (ProcessedLines << 3);
-						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
-					}
-				}
-				break;
 			case 0x70000000://16-bit Greater Than
-				if (Second8 <= (Read32(Offset) & 0xFFFF))
-				{
-					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
-					{
-						IFile_Read(fin, read_len, buf, 0x08);
-						First8 = buf[0];
-						Second8 = buf[1];
-						ProcessedLines++;
-					}
-
-					if (First8 == 0xD2000000)
-					{
-						if (RepeatCount > 0x00)
-						{
-							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							fin->pos = ARCODE_POS + (ProcessedLines << 3);
-						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
-					}
-				}
-				break;
 			case 0x80000000://16-bit Less Than
-				if (Second8 >= (Read32(Offset) & 0xFFFF))
-				{
-					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
-					{
-						IFile_Read(fin, read_len, buf, 0x08);
-						First8 = buf[0];
-						Second8 = buf[1];
-						ProcessedLines++;
-					}
-
-					if (First8 == 0xD2000000)
-					{
-						if (RepeatCount > 0x00)
-						{
-							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							fin->pos = ARCODE_POS + (ProcessedLines << 3);
-						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
-					}
-				}
-				break;
 			case 0x90000000://16-bit Equal To
-				if (Second8 != (Read32(Offset) & 0xFFFF))
-				{
-					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
-					{
-						IFile_Read(fin, read_len, buf, 0x08);
-						First8 = buf[0];
-						Second8 = buf[1];
-						ProcessedLines++;
-					}
-
-					if (First8 == 0xD2000000)
-					{
-						if (RepeatCount > 0x00)
-						{
-							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							fin->pos = ARCODE_POS + (ProcessedLines << 3);
-						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
-					}
-				}
-				break;
 			case 0xA0000000://16-bit Not Equal To
-				if (Second8 == (Read32(Offset) & 0xFFFF))
-				{
+				Data = Read32(Offset);
+				if(
+					((Type == 0x30000000) && (Second8 <= Data)) ||
+					((Type == 0x40000000) && (Second8 >= Data)) ||
+					((Type == 0x50000000) && (Second8 != Data)) ||
+					((Type == 0x60000000) && (Second8 == Data)) ||
+					((Type == 0x70000000) && (Second8 <= (Data & 0x0000FFFF))) ||
+					((Type == 0x80000000) && (Second8 >= (Data & 0x0000FFFF))) ||
+					((Type == 0x90000000) && (Second8 != (Data & 0x0000FFFF))) ||
+					((Type == 0xA0000000) && (Second8 == (Data & 0x0000FFFF)))
+				){
 					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
 					{
 						IFile_Read(fin, read_len, buf, 0x08);
@@ -247,14 +96,12 @@ int uvl_entry()
 				break;
 			case 0xB0000000://Load Offset
 				CodeOffset = Read32(Offset);
-				CodeOffset += (CodeOffset < CODE_OFFSET) ? CODE_OFFSET | 0;
+				CodeOffset += (CodeOffset < CODE_OFFSET) ? CODE_OFFSET : 0;
 				break;
-
 			case 0xC0000000://Loop Code
 				RepeatCount = Second8;
 				RepeatStart = ProcessedLines;
 				break;
-
 			case 0xD0000000://Various
 				Offset = CodeOffset + (Second8 & 0xFFFFFFF);
 				switch (First8 & 0x0F000000)
@@ -314,8 +161,8 @@ int uvl_entry()
 				}
 				break;
 			case 0xE0000000://Patch Code
-				unsigned int tempcount = 0x00;
 				Data = Second8;
+				unsigned int tempcount = 0x00;
 
 				while ((Data > 0x00) && (ProcessedLines < LineCount))
 				{
@@ -344,21 +191,21 @@ int uvl_entry()
 					}
 					else if (Data >= 0x02)//16bit
 					{
-						Write16(Offset, ((tempcount & 0x01) == 0x00) ? First8 : Second 8);
+						Write16(Offset, ((tempcount & 0x01) == 0x00) ? First8 : Second8);
 						Offset += 0x02;
 						Data -= 0x02;
 					}
 					else//8bit
 					{
-						Write8(Offset, ((tempcount & 0x01) == 0x00) ? First8 : Second 8);
+						Write8(Offset, ((tempcount & 0x01) == 0x00) ? First8 : Second8);
 						Offset += 0x01;
 						Data -= 0x01;
 					}
 				}
 				break;
 			case 0xF0000000://Memory Copy Code
-				unsigned int tempoffset = CodeOffset;
 				Offset = CODE_OFFSET + (First8 & 0x0FFFFFFF);
+				unsigned int tempoffset = CodeOffset;
 
 				while (Second8 > 0x00)
 				{
@@ -413,7 +260,7 @@ void Write32(unsigned int Offset, unsigned int Data)
 	unsigned int offs = (Offset & 0x0F) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	unsigned int mask = 0xFFFFFFFF << shift;
-	buf[offs] = (buf[offs] & ~mask) | ((Data << shift ) & mask));
+	buf[offs] = (buf[offs] & ~mask) | ((Data << shift ) & mask);
 	buf[offs+1] = (buf[offs+1] & mask) | ((Data >> (0x20 - shift)) & ~mask);
 
 	WriteMemory(Offset);
@@ -426,7 +273,7 @@ void Write16(unsigned int Offset, unsigned int Data)
 	unsigned int offs = (Offset & 0x0F) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	unsigned int mask = 0x0000FFFF << shift;
-	unsigned int mask1 = (mask == 0xFF000000) ? 0x000000FF | 0x00000000;
+	unsigned int mask1 = (mask == 0xFF000000) ? 0x000000FF : 0x00000000;
 	buf[offs] = (buf[offs] & ~mask) | (Data << shift);
 	buf[offs+1] = (buf[offs+1] & ~mask1) | ((Data >> (0x20 - shift)) & mask1);
 	WriteMemory(Offset);
