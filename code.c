@@ -15,7 +15,6 @@ int uvl_entry()
 {
 	FILE *fin = (void *)0x08F10000;
 	int *read_len = (int *)0x08F10020;
-	int *written = (int *)0x08F01000;
 	unsigned int LineCount = 0;
 	unsigned int ProcessedLines = 0;
 	unsigned int Type=0;
