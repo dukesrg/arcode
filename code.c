@@ -171,7 +171,7 @@ int uvl_entry()
 					Second8 = buf[1];
 					ProcessedLines++;
 
-					if (Data >= 0x04)//Double 32bit
+					if (Data >= 0x08)//Double 32bit
 					{
 						Write32(Offset, First8);
 						Offset += 0x04;
