@@ -3,11 +3,12 @@
 
 #define CODE_OFFSET	0x14000000
 #define ARCODE_POS	0x00000001
+#define MASK_32		0xFFFFFFFF
+#define MASK_16		0x0000FFFF
+#define MASK_8		0x000000FF
 
-void Write32(unsigned int Offset, unsigned int Data);
-void Write16(unsigned int Offset, unsigned int Data);
-void Write8(unsigned int Offset, unsigned int Data);
-unsigned int Read32(unsigned int Offset);
+unsigned int Read(unsigned int Offset, unsigned int Mask);
+void Write(unsigned int Offset, unsigned int Data, unsigned int Mask);
 
 unsigned int *buf = (unsigned int *)0x18410000;
 
@@ -15,109 +16,104 @@ int uvl_entry()
 {
 	unsigned int *arcode = (unsigned int *)L"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 	unsigned int Index = 0;
-	unsigned int LineCount = 0;
-	unsigned int ProcessedLines = 0;
-	unsigned int Type=0;
-	unsigned int First8 = 0;
-	unsigned int Second8 = 0;
+	unsigned int WordCount;
+	unsigned int Type;
+	unsigned int First8;
+	unsigned int Second8;
 	unsigned int CodeOffset = CODE_OFFSET;
-	unsigned int CodeData = 0;
+	unsigned int CodeData;
 	unsigned int Offset;
-	unsigned int Data = 0;
-	unsigned int RepeatCount = 0;
-	unsigned int RepeatStart = 0;
+	unsigned int Data;
+	unsigned int RepeatCount;
+	unsigned int RepeatStart;
+	unsigned int Mask;
+	unsigned int Increment;
 
-	LineCount = arcode[Index++];
+	WordCount = arcode[Index++] << 1;
 
-	while (ProcessedLines < LineCount)
+	while (WordCount > 0)
 	{
 		First8 = arcode[Index++];
 		Second8 = arcode[Index++];
-		ProcessedLines++;
+		WordCount -= 2;
 		Offset = CodeOffset + (First8 & 0x0FFFFFFF);
+		Mask = MASK_32;
+		Increment = 4;
 		switch (Type = First8 & 0xF0000000)
 		{
-			case 0x00000000://32-bit Write
-				Write32(Offset, Second8);
-				break;
-			case 0x10000000://16-bit Write
-				Write16(Offset, Second8);
-				break;
 			case 0x20000000://8-bit Write
-				Write8(Offset, Second8);
+				Mask >>= 8;
+			case 0x10000000://16-bit Write
+				Mask >>= 16;
+			case 0x00000000://32-bit Write
+				Write(Offset, Second8, Mask);
 				break;
-			case 0x30000000://32-bit Greater Than
-			case 0x40000000://32-bit Less Than
-			case 0x50000000://32-bit Equal To
-			case 0x60000000://32-bit Not Equal To
 			case 0x70000000://16-bit Greater Than
 			case 0x80000000://16-bit Less Than
 			case 0x90000000://16-bit Equal To
 			case 0xA0000000://16-bit Not Equal To
-				Data = Read32(Offset);
-				if(
-					((Type == 0x30000000) && (Second8 <= Data)) ||
-					((Type == 0x40000000) && (Second8 >= Data)) ||
-					((Type == 0x50000000) && (Second8 != Data)) ||
-					((Type == 0x60000000) && (Second8 == Data)) ||
-					((Type == 0x70000000) && (Second8 <= (Data & 0x0000FFFF))) ||
-					((Type == 0x80000000) && (Second8 >= (Data & 0x0000FFFF))) ||
-					((Type == 0x90000000) && (Second8 != (Data & 0x0000FFFF))) ||
-					((Type == 0xA0000000) && (Second8 == (Data & 0x0000FFFF)))
-				){
-					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
+				Mask >>= 16;
+				Second8 &= ~Second8 >> 16;
+			case 0x30000000://32-bit Greater Than
+			case 0x40000000://32-bit Less Than
+			case 0x50000000://32-bit Equal To
+			case 0x60000000://32-bit Not Equal To
+				Type &= 0x30000000;
+				Data = Read(Offset, Mask);
+				if (Type == 0x30000000 && Second8 <= Data || Type == 0x00000000 && Second8 >= Data || Type == 0x10000000 && Second8 != Data || Type == 0x20000000 && Second8 == Data)
+				{
+					while (First8 != 0xD0000000 && First8 != 0xD2000000 && WordCount > 0)
 					{
-						First8 = arcode[Index++];
-						Second8 = arcode[Index++];
-						ProcessedLines++;
+						First8 = arcode[Index];
+						Index += 2;
+						WordCount -= 2;
 					}
-
 					if (First8 == 0xD2000000)
 					{
-						if (RepeatCount > 0x00)
+						if (RepeatCount > 0)
 						{
 							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							Index = ARCODE_POS + (ProcessedLines << 1);
+							Index = ARCODE_POS + (RepeatStart << 1);
 						}
 						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
+						CodeData = 0;
 					}
 				}
 				break;
 			case 0xB0000000://Load Offset
-				CodeOffset = Read32(Offset);
-				CodeOffset += (CodeOffset < CODE_OFFSET) ? CODE_OFFSET : 0;
+				if ((CodeOffset = Read(Offset, Mask)) < CODE_OFFSET)
+				{
+					CodeOffset += CODE_OFFSET;
+				}
 				break;
 			case 0xC0000000://Loop Code
 				RepeatCount = Second8;
-				RepeatStart = ProcessedLines;
+				RepeatStart = (Index - ARCODE_POS) >> 1;
 				break;
 			case 0xD0000000://Various
 				Offset = CodeOffset + (Second8 & 0xFFFFFFF);
 				switch (First8 & 0x0F000000)
 				{
 					case 0x01000000://Loop execute variant
-						if (RepeatCount > 0x00)
+						if (RepeatCount > 0)
 						{
 							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							Index = ARCODE_POS + (ProcessedLines << 1);
+							Index = ARCODE_POS + (RepeatStart << 1);
 						}
 						break;
 					case 0x02000000://Loop Execute Variant / Full Terminator
-						if (RepeatCount > 0x00)
+						if (RepeatCount > 0)
 						{
 							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							Index = ARCODE_POS + (ProcessedLines << 1);
+							Index = ARCODE_POS + (RepeatStart << 1);
 						}
 						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
+						CodeData = 0;
 						break;
 					case 0x03000000://Set Offset
-						CodeOffset = Second8;
-						CodeOffset += (CodeOffset < CODE_OFFSET) ? CODE_OFFSET : 0;
+						if ((CodeOffset = Second8) < CODE_OFFSET){
+								CodeOffset += CODE_OFFSET;
+						}
 						break;
 					case 0x04000000://Add Value
 						CodeData += Second8;
@@ -125,106 +121,98 @@ int uvl_entry()
 					case 0x05000000://Set Value
 						CodeData = Second8;
 						break;
-					case 0x06000000://32-Bit Incrementive Write
-						Write32(Offset, CodeData);
-						CodeOffset += 0x04;
-						break;
-					case 0x07000000://16-Bit Incrementive Write
-						Write16(Offset, CodeData);
-						CodeOffset += 0x02;
-						break;
 					case 0x08000000://8-Bit Incrementive Write
-						Write8(Offset, CodeData);
-						CodeOffset++;
-						break;
-					case 0x09000000://32-Bit Load
-						CodeData = Read32(Offset);
-						break;
-					case 0x0A000000://16-Bit Load
-						CodeData = Read32(Offset) & 0xFFFF;
+						Mask >>= 8;
+						Increment >>= 1;
+					case 0x07000000://16-Bit Incrementive Write
+						Mask >>= 16;
+						Increment >>= 1;
+					case 0x06000000://32-Bit Incrementive Write
+						Write(Offset, CodeData, Mask);
+						CodeOffset += Increment;
 						break;
 					case 0x0B000000://8-Bit Load
-						CodeData = Read32(Offset) & 0xFF;
+						Mask >>= 8;
+					case 0x0A000000://16-Bit Load
+						Mask >>= 16;
+					case 0x09000000://32-Bit Load
+						CodeData = Read(Offset, Mask);
 						break;
-					case 0x0C000000://Add Offset
+ 					case 0x0C000000://Add Offset
 						CodeOffset += Second8;
 						break;
 				}
 				break;
 			case 0xE0000000://Patch Code
 				Data = Second8;
-				unsigned int tempcount = 0x00;
-
-				while ((Data > 0x00) && (ProcessedLines < LineCount))
+				while (Data > 0 && WordCount > 0)
 				{
 					First8 = arcode[Index++];
 					Second8 = arcode[Index++];
-					ProcessedLines++;
+					WordCount -= 2;
 
-					if (Data >= 0x08)//Double 32bit
+					if (Data >= 8)//Double 32bit
 					{
-						Write32(Offset, First8);
-						Offset += 0x04;
-
-						Write32(Offset, Second8);
-						Offset += 0x04;
-
-						Data -= 0x08;
-						tempcount += 0x02;
+						Write(Offset, First8, MASK_32);
+						Offset += 4;
+						Write(Offset, Second8, MASK_32);
+						Offset += 4;
+						Data -= 8;
 					}
-					else if (Data >= 0x04)//32bit
+					else
 					{
-						Write32(Offset, First8);
-						Offset += 0x04;
-						Data -= 0x04;
-						tempcount++;
+						if (Data >= 4)//32bit
+						{
+							Write(Offset, First8, MASK_32);
+							Offset += 4;
+							Data -= 4;
+							First8 = Second8;
+						}
+						if (Data >= 2)//16bit
+						{
+							Write(Offset, First8, MASK_16);
+							Offset += 2;
+							Data -= 2;
+							First >>= 16;
+						}
+						if (Data == 1)//8bit
+						{
+							Write(Offset, First8,  MASK_8);
+							Data--;
+						}
 					}
-					else if (Data >= 0x02)//16bit
-					{
-						Write16(Offset, ((tempcount & 0x01) == 0x00) ? First8 : Second8);
-						Offset += 0x02;
-						Data -= 0x02;
-					}
-					else//8bit
-					{
-						Write8(Offset, ((tempcount & 0x01) == 0x00) ? First8 : Second8);
-						Offset += 0x01;
-						Data -= 0x01;
-					}
-				}
 				break;
 			case 0xF0000000://Memory Copy Code
 				Offset = CODE_OFFSET + (First8 & 0x0FFFFFFF);
 				unsigned int tempoffset = CodeOffset;
 
-				while (Second8 > 0x00)
+				while (Second8 > 0)
 				{
-					if (Second8 >= 0x04)//32bit
+					if (Second8 >= 4)//32bit
 					{
-						Write32(Offset, Read32(tempoffset));
-						tempoffset += 0x04;
-						Offset += 0x04;
-						Second8 -= 0x04;
+						Write(Offset, Read(tempoffset, MASK_32), MASK_32);
+						tempoffset += 4;
+						Offset += 4;
+						Second8 -= 4;
 					}
-					else if (Second8 >= 0x02)//16bit
+					else if (Second8 >= 2)//16bit
 					{
-						Write16(Offset, Read32(tempoffset) & 0xFFFF);
-						tempoffset += 0x02;
-						Offset += 0x02;
-						Second8 -= 0x02;
+						Write(Offset, Read(tempoffset, MASK_16) , MASK_16);
+						tempoffset += 2;
+						Offset += 2;
+						Second8 -= 2;
 					}
 					else//8bit
 					{
-						Write8(Offset, Read32(tempoffset) & 0xFF);
-						tempoffset += 0x01;
-						Offset += 0x01;
-						Second8 -= 0x01;
+						Write(Offset, Read(tempoffset, MASK_8), MASK_8);
+						tempoffset += 1;
+						Offset += 1;
+						Second8 -= 1;
 					}
 				}
 			break;
 		}
 	}
-
 	return 0;
 }
 
@@ -235,44 +223,26 @@ void CopyMem(void *src, void *dst){
 	svcSleepThread(0x200000LL);
 }
 
-void Write32(unsigned int Offset, unsigned int Data)
+unsigned int Read(unsigned int Offset, unsigned int Mask)
 {
+	unsigned int shift = Offset << 3 & 24;
+	unsigned int offs = Offset >> 2 & 3;
 	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
-	unsigned int offs = (Offset & 0x0F) >> 2;
-	unsigned int shift = (Offset & 0x03) << 3;
-	unsigned int mask = 0xFFFFFFFF << shift;
-	buf[offs] = (buf[offs] & ~mask) | ((Data << shift ) & mask);
-	buf[offs+1] = (buf[offs+1] & mask) | ((Data >> (0x20 - shift)) & ~mask);
-	CopyMem(buf, (void *)(Offset & 0xFFFFFFF0));
+	return (buf[offs] >> shift) | (buf[offs+1] << (32 - shift)) & Mask;
 }
 
-void Write16(unsigned int Offset, unsigned int Data)
+void Write(unsigned int Offset, unsigned int Data, unsigned int Mask)
 {
+	unsigned int shift = Offset << 3 & 24;
+	unsigned int offs = Offset >> 2 & 3;
 	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
-	Data &= 0x0000FFFF;
-	unsigned int offs = (Offset & 0x0F) >> 2;
-	unsigned int shift = (Offset & 0x03) << 3;
-	unsigned int mask = 0x0000FFFF << shift;
-	unsigned int mask1 = (mask == 0xFF000000) ? 0x000000FF : 0x00000000;
-	buf[offs] = (buf[offs] & ~mask) | (Data << shift);
-	buf[offs+1] = (buf[offs+1] & ~mask1) | ((Data >> (0x20 - shift)) & mask1);
+	Data &= Mask;
+	buf[offs] &= ~(Mask << shift)
+	buf[offs] |= Data << shift;
+	offs++;
+	shift = 32 - shift;
+	buf[offs] &= ~(Mask >> shift)
+	buf[offs] |= Data >> shift;
+	WriteMemory(Offset);
 	CopyMem(buf, (void *)(Offset & 0xFFFFFFF0));
-}
-
-void Write8(unsigned int Offset, unsigned int Data)
-{
-	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
-	unsigned int offs = (Offset & 0x0F) >> 2;
-	unsigned int shift = (Offset & 0x03) << 3;
-	buf[offs] = (buf[offs] & ~(0x000000FF << shift)) | ((Data & 0x000000FF) << shift);
-	CopyMem(buf, (void *)(Offset & 0xFFFFFFF0));
-}
-
-unsigned int Read32(unsigned int Offset)
-{
-	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
-	unsigned int offs = (Offset & 0x0F) >> 2;
-	unsigned int shift = (Offset & 0x03) << 3;
-	unsigned int mask = 0xFFFFFFFF >> shift;
-	return ((buf[offs] >> shift) & mask) | ((buf[offs+1] << (0x20 - shift)) & ~mask);
 }
