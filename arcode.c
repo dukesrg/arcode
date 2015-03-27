@@ -22,7 +22,7 @@ int uvl_entry()
 	unsigned int Second8 = 0;
 	unsigned int CodeOffset = CODE_OFFSET;
 	unsigned int CodeData = 0;
-	unsigned int Offset = 0;
+	unsigned int Offset;
 	unsigned int Data = 0;
 	unsigned int RepeatCount = 0;
 	unsigned int RepeatStart = 0;
