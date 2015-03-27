@@ -173,7 +173,7 @@ int uvl_entry()
 							Write(Offset, First8, MASK_16);
 							Offset += 2;
 							Data -= 2;
-							First >>= 16;
+							First8 >>= 16;
 						}
 						if (Data == 1)//8bit
 						{
@@ -181,6 +181,7 @@ int uvl_entry()
 							Data--;
 						}
 					}
+				}
 				break;
 			case 0xF0000000://Memory Copy Code
 				Offset = CODE_OFFSET + (First8 & 0x0FFFFFFF);
@@ -237,12 +238,11 @@ void Write(unsigned int Offset, unsigned int Data, unsigned int Mask)
 	unsigned int offs = Offset >> 2 & 3;
 	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
 	Data &= Mask;
-	buf[offs] &= ~(Mask << shift)
+	buf[offs] &= ~(Mask << shift);
 	buf[offs] |= Data << shift;
 	offs++;
 	shift = 32 - shift;
-	buf[offs] &= ~(Mask >> shift)
+	buf[offs] &= ~(Mask >> shift);
 	buf[offs] |= Data >> shift;
-	WriteMemory(Offset);
 	CopyMem(buf, (void *)(Offset & 0xFFFFFFF0));
 }
