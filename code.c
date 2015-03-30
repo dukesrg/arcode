@@ -76,6 +76,14 @@ int uvl_entry()
 						First8 = buf[0];
 						Second8 = buf[1];
 						ProcessedLines++;
+						if ((First8 & 0xF0000000) == 0xE00000000){
+							ProcessedLines += Second8 + 7 >> 3;
+							fin->pos = ARCODE_POS + (ProcessedLines << 3);
+							IFile_Read(fin, read_len, buf, 0x08);
+							First8 = buf[0];
+							Second8 = buf[1];
+							ProcessedLines++;
+						}
 					}
 
 					if (First8 == 0xD2000000)
