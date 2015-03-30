@@ -14,25 +14,25 @@ void CopyMem(void *src, void *dst){
 
 void Write(unsigned int offset, unsigned char data){
 	CopyMem((void *)offset, BUFFER);
-    *((unsigned char*)BUFFER + (offset & 0x0F)) = data;
+	*((unsigned char*)BUFFER + (offset & 0x0F)) = data;
 	CopyMem(BUFFER, (void *)offset);
 }
 
 void Write(unsigned int offset, unsigned short data){
 	CopyMem((void *)offset, BUFFER);
-    *(unsigned short*)((unsigned char*)BUFFER + (offset & 0x0F)) = data;
+	*(unsigned short*)((unsigned char*)BUFFER + (offset & 0x0F)) = data;
 	CopyMem(BUFFER, (void *)offset);
 }
 
 void Write(unsigned int offset, unsigned int data){
 	CopyMem((void *)offset, BUFFER);
-    *(unsigned int*)((unsigned char*)BUFFER + (offset & 0x0F)) = data;
+	*(unsigned int*)((unsigned char*)BUFFER + (offset & 0x0F)) = data;
 	CopyMem(BUFFER, (void *)offset);
 }
 
 unsigned int Read(unsigned int offset){
 	CopyMem((void*)Offset, BUFFER);
-    return *(unsigned int*)((unsigned char*)BUFFER + (offset & 0x0F));
+	return *(unsigned int*)((unsigned char*)BUFFER + (offset & 0x0F));
 }
 
 int uvl_entry(){
