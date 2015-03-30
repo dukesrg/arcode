@@ -75,8 +75,8 @@ int uvl_entry(){
 			case 0x60000000://32-bit Not Equal To
 				Data = Read(Offset);
 				if (Type >= 0x70000000){
+					Data = (unsigned short)Data & ~Second8 >> 16;
 					Second8 = (unsigned short)Second8;
-					Data = ((unsigned short)Data) & ~Second8 >> 16;
 				}
 				Type &= 0x30000000;
 				if (Type == 0x30000000 && Second8 <= Data || Type == 0x00000000 && Second8 >= Data || Type == 0x10000000 && Second8 != Data || Type == 0x20000000 && Second8 == Data){
