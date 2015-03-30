@@ -81,8 +81,12 @@ int uvl_entry(){
 				Type &= 0x30000000;
 				if (Type == 0x30000000 && Second8 <= Data || Type == 0x00000000 && Second8 >= Data || Type == 0x10000000 && Second8 != Data || Type == 0x20000000 && Second8 == Data){
 					while (First8 != 0xD0000000 && First8 != 0xD2000000 && Index < WordCount){
-						First8 = arcode[Index];
-						Index += 2;
+						First8 = arcode[Index++];
+						if ((First8 & 0xF0000000) == 0xE00000000){
+							Index += arcode[Index++] + 7 >> 3 << 1;
+							First8 = arcode[Index++];
+						}
+						Index++;
 					}
 					if (First8 == 0xD2000000){
 						if (RepeatCount > 0){
