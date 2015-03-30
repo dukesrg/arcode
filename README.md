@@ -8,7 +8,6 @@ Run with http://bit.ly/1LgLvSG (http://dukesrg.no-ip.org/3ds/rop/?LoadCode.dat&a
 
 Limitations
 Code only executes once. So no freezing values, or enable/disable with button combos while in-game.
-16-bit conditionals do not currently include the masking feature.
 Non of the code hacks work.
 
 Offsets are based on the FCRAM dump offsets. ARCode will automatically add 0x14000000 to them.
