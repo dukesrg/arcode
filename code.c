@@ -65,10 +65,10 @@ int uvl_entry()
 					((Type == 0x40000000) && (Second8 >= Data)) ||
 					((Type == 0x50000000) && (Second8 != Data)) ||
 					((Type == 0x60000000) && (Second8 == Data)) ||
-					((Type == 0x70000000) && ((Second8 & (~Second8 >> 16)) <= (Data & 0x0000FFFF))) ||
-					((Type == 0x80000000) && ((Second8 & (~Second8 >> 16)) >= (Data & 0x0000FFFF))) ||
-					((Type == 0x90000000) && ((Second8 & (~Second8 >> 16)) != (Data & 0x0000FFFF))) ||
-					((Type == 0xA0000000) && ((Second8 & (~Second8 >> 16)) == (Data & 0x0000FFFF)))
+					((Type == 0x70000000) && ((Second8 & 0x0000FFFF) <= (Data & 0x0000FFFF & ~Second8 >> 16 ))) ||
+					((Type == 0x80000000) && ((Second8 & 0x0000FFFF) >= (Data & 0x0000FFFF & ~Second8 >> 16))) ||
+					((Type == 0x90000000) && ((Second8 & 0x0000FFFF) != (Data & 0x0000FFFF & ~Second8 >> 16))) ||
+					((Type == 0xA0000000) && ((Second8 & 0x0000FFFF) == (Data & 0x0000FFFF & ~Second8 >> 16))) )
 				){
 					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
 					{
