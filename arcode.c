@@ -69,14 +69,14 @@ int uvl_entry(){
 			case 0x80000000://16-bit Less Than
 			case 0x90000000://16-bit Equal To
 			case 0xA0000000://16-bit Not Equal To
-				Second8 &= ~Second8 >> 16;
 			case 0x30000000://32-bit Greater Than
 			case 0x40000000://32-bit Less Than
 			case 0x50000000://32-bit Equal To
 			case 0x60000000://32-bit Not Equal To
 				Data = Read(Offset);
 				if (Type >= 0x70000000){
-					Data = (unsigned short)Data;
+					Second8 = (unsigned short)Second8;
+					Data = ((unsigned short)Data) & ~Second8 >> 16;
 				}
 				Type &= 0x30000000;
 				if (Type == 0x30000000 && Second8 <= Data || Type == 0x00000000 && Second8 >= Data || Type == 0x10000000 && Second8 != Data || Type == 0x20000000 && Second8 == Data){
