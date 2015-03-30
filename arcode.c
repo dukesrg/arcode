@@ -12,26 +12,26 @@ void CopyMem(void *src, void *dst){
 	svcSleepThread(0x200000LL);
 }
 
-void Write(unsigned int offset, unsigned char data){
+void Write8(unsigned int offset, unsigned int data){
 	CopyMem((void *)offset, BUFFER);
-	*((unsigned char*)BUFFER + (offset & 0x0F)) = data;
+	*((unsigned char*)BUFFER + (offset & 0x0F)) = (unsigned char)data;
 	CopyMem(BUFFER, (void *)offset);
 }
 
-void Write(unsigned int offset, unsigned short data){
+void Write16(unsigned int offset, unsigned int data){
 	CopyMem((void *)offset, BUFFER);
-	*(unsigned short*)((unsigned char*)BUFFER + (offset & 0x0F)) = data;
+	*(unsigned short*)((unsigned char*)BUFFER + (offset & 0x0F)) = (unsigned short)data;
 	CopyMem(BUFFER, (void *)offset);
 }
 
-void Write(unsigned int offset, unsigned int data){
+void Write32(unsigned int offset, unsigned int data){
 	CopyMem((void *)offset, BUFFER);
 	*(unsigned int*)((unsigned char*)BUFFER + (offset & 0x0F)) = data;
 	CopyMem(BUFFER, (void *)offset);
 }
 
 unsigned int Read(unsigned int offset){
-	CopyMem((void*)Offset, BUFFER);
+	CopyMem((void*)offset, BUFFER);
 	return *(unsigned int*)((unsigned char*)BUFFER + (offset & 0x0F));
 }
 
@@ -57,13 +57,13 @@ int uvl_entry(){
 		Offset = CodeOffset + (First8 & 0x0FFFFFFF);
 		switch (Type = First8 & 0xF0000000){
 			case 0x00000000://32-bit Write
-				Write(Offset, Second8);
+				Write32(Offset, Second8);
 				break;
 			case 0x10000000://16-bit Write
-				Write(Offset, (unsigned short)Second8);
+				Write16(Offset, Second8);
 				break;
 			case 0x20000000://8-bit Write
-				Write(Offset, (unsigned char)Second8);
+				Write8(Offset, Second8);
 				break;
 			case 0x70000000://16-bit Greater Than
 			case 0x80000000://16-bit Less Than
@@ -136,14 +136,14 @@ int uvl_entry(){
 						CodeData = Second8;
 						break;
 					case 0x06000000://32-Bit Incrementive Write
-						Write(Offset, CodeData);
+						Write32(Offset, CodeData);
 						CodeOffset += 4;
 						break;
 					case 0x07000000://16-Bit Incrementive Write
-						Write(Offset, (unsigned short)CodeData);
+						Write16(Offset, CodeData);
 						CodeOffset += 2;
 					case 0x08000000://8-Bit Incrementive Write
-						Write(Offset, (unsigned char)CodeData);
+						Write8(Offset, CodeData);
 						CodeOffset++ ;
 						break;
 					case 0x09000000://32-Bit Load
@@ -164,27 +164,27 @@ int uvl_entry(){
 				while (Second8 > 0 && Index < WordCount){
 					First8 = arcode[Index++];
 					if (Second8 >= 8){
-						Write(Offset, First8);
+						Write32(Offset, First8);
 						Offset += 4;
-						Write(Offset, arcode[Index++]);
+						Write32(Offset, arcode[Index++]);
 						Offset += 4;
 						Second8 -= 8;
 					}else{
 						if (Second8 >= 4){
-							Write(Offset, First8);
+							Write32(Offset, First8);
 							Offset += 4;
 							Second8 -= 4;
 							First8 = arcode[Index];
 						}
 						Index++;
 						if (Second8 >= 2){
-							Write(Offset, (unsigned short)First8);
+							Write16(Offset, First8);
 							Offset += 2;
 							Second8 -= 2;
 							First8 >>= 16;
 						}
 						if (Second8 == 1){
-							Write(Offset, (unsigned char)First8);
+							Write8(Offset, First8);
 							Offset++;
 							Second8--;
 						}
@@ -195,19 +195,19 @@ int uvl_entry(){
 				Offset = CODE_OFFSET + (First8 & 0x0FFFFFFF);
 				unsigned int tempoffset = CodeOffset;
 				while (Second8 >= 4){
-					Write(Offset, Read(tempoffset));
+					Write32(Offset, Read(tempoffset));
 					tempoffset += 4;
 					Offset += 4;
 					Second8 -= 4;
 				}
 				if (Second8 >= 2){
-					Write(Offset, (unsigned short)Read(tempoffset));
+					Write16(Offset, Read(tempoffset));
 					tempoffset += 2;
 					Offset += 2;
 					Second8 -= 2;
 				}
 				if (Second8 == 1){
-					Write(Offset, (unsigned char)Read(tempoffset));
+					Write8(Offset, Read(tempoffset));
 				}
 			break;
 		}
