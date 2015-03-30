@@ -191,10 +191,10 @@ int uvl_entry(){
 				Offset = CODE_OFFSET + (First8 & 0x0FFFFFFF);
 				unsigned int tempoffset = CodeOffset;
 				while (Second8 >= 4){
-						Write(Offset, Read(tempoffset));
-						tempoffset += 4;
-						Offset += 4;
-						Second8 -= 4;
+					Write(Offset, Read(tempoffset));
+					tempoffset += 4;
+					Offset += 4;
+					Second8 -= 4;
 				}
 				if (Second8 >= 2){
 					Write(Offset, (unsigned short)Read(tempoffset));
