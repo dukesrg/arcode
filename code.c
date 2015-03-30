@@ -68,7 +68,7 @@ int uvl_entry()
 					((Type == 0x70000000) && ((Second8 & 0x0000FFFF) <= (Data & 0x0000FFFF & ~Second8 >> 16 ))) ||
 					((Type == 0x80000000) && ((Second8 & 0x0000FFFF) >= (Data & 0x0000FFFF & ~Second8 >> 16))) ||
 					((Type == 0x90000000) && ((Second8 & 0x0000FFFF) != (Data & 0x0000FFFF & ~Second8 >> 16))) ||
-					((Type == 0xA0000000) && ((Second8 & 0x0000FFFF) == (Data & 0x0000FFFF & ~Second8 >> 16))) )
+					((Type == 0xA0000000) && ((Second8 & 0x0000FFFF) == (Data & 0x0000FFFF & ~Second8 >> 16)))
 				){
 					while ((First8 != 0xD0000000) && (First8 != 0xD2000000) && (ProcessedLines < LineCount))
 					{
