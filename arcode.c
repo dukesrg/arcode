@@ -1,9 +1,9 @@
-#include "spider.h"
+f#include "spider.h"
 #include "fs.h"
 
-#define BUFFER		((void*)0x18410000)
-#define CODE_OFFSET			0x14000000
-#define ARCODE_POS			0x00000001
+#define BUFFER_LOC		0x18410000
+#define CODE_OFFSET		0x14000000
+#define ARCODE_POS		0x00000001
 
 void CopyMem(void *src, void *dst){
 	GSPGPU_FlushDataCache(src, 0x20);
@@ -12,42 +12,35 @@ void CopyMem(void *src, void *dst){
 	svcSleepThread(0x200000LL);
 }
 
-void Write8(unsigned int offset, unsigned int data){
-	CopyMem((void *)offset, BUFFER);
-	*((unsigned char*)BUFFER + (offset & 0x0F)) = (unsigned char)data;
-	CopyMem(BUFFER, (void *)offset);
-}
+unsigned Read(unsigned Offset, unsigned Mask) 
+{ 
+	CopyMem((void*)Offset, (void*)BUFFER_LOC);
+	return *(unsigned*)(BUFFER_LOC + (Offset & 0x0000000F)) & Mask;
+} 
 
-void Write16(unsigned int offset, unsigned int data){
-	CopyMem((void *)offset, BUFFER);
-	*(unsigned short*)((unsigned char*)BUFFER + (offset & 0x0F)) = (unsigned short)data;
-	CopyMem(BUFFER, (void *)offset);
-}
-
-void Write32(unsigned int offset, unsigned int data){
-	CopyMem((void *)offset, BUFFER);
-	*(unsigned int*)((unsigned char*)BUFFER + (offset & 0x0F)) = data;
-	CopyMem(BUFFER, (void *)offset);
-}
-
-unsigned int Read(unsigned int offset){
-	CopyMem((void*)offset, BUFFER);
-	return *(unsigned int*)((unsigned char*)BUFFER + (offset & 0x0F));
-}
+void Write(unsigned Offset, unsigned Data, unsigned Mask) 
+{ 
+	CopyMem((void*)Offset, (void*)BUFFER_LOC);
+	*(unsigned*)(BUFFER_LOC + (Offset & 0x0000000F)) &= ~Mask; 
+	*(unsigned*)(BUFFER_LOC + (Offset & 0x0000000F)) |= Data & Mask; 
+	CopyMem((void*)BUFFER_LOC, (void*)Offset); 
+} 
 
 int uvl_entry(){
-	unsigned int *arcode = (unsigned int *)L"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
-	unsigned int Index = 0;
-	unsigned int WordCount;
-	unsigned int Type;
-	unsigned int First8;
-	unsigned int Second8;
-	unsigned int CodeOffset = CODE_OFFSET;
-	unsigned int CodeData;
-	unsigned int Offset;
-	unsigned int Data;
-	unsigned int RepeatCount;
-	unsigned int RepeatStart;
+	unsigned *arcode = (unsigned*)L"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+	unsigned Index = 0;
+	unsigned WordCount;
+	unsigned Type;
+	unsigned First8;
+	unsigned Second8;
+	unsigned CodeOffset = CODE_OFFSET;
+	unsigned CodeData;
+	unsigned Offset;
+	unsigned Data;
+	unsigned RepeatCount;
+	unsigned RepeatStart;
+	unsigned Mask;
+	unsigned Increment;
 
 	WordCount = arcode[Index++] << 1;
 
@@ -55,35 +48,33 @@ int uvl_entry(){
 		First8 = arcode[Index++];
 		Second8 = arcode[Index++];
 		Offset = CodeOffset + (First8 & 0x0FFFFFFF);
+		Mask = 0xFFFFFFFF;
+		Increment = 4;
 		switch (Type = First8 & 0xF0000000){
-			case 0x00000000://32-bit Write
-				Write32(Offset, Second8);
-				break;
-			case 0x10000000://16-bit Write
-				Write16(Offset, Second8);
-				break;
 			case 0x20000000://8-bit Write
-				Write8(Offset, Second8);
+				Mask >>= 8;
+			case 0x10000000://16-bit Write
+				Mask >>= 16;
+			case 0x00000000://32-bit Write
+				Write(Offset, Second8, Mask);
 				break;
 			case 0x70000000://16-bit Greater Than
 			case 0x80000000://16-bit Less Than
 			case 0x90000000://16-bit Equal To
 			case 0xA0000000://16-bit Not Equal To
+				Mask &= ~Second8 >> 16;
+				Second8 &= 0x0000FFFF;
 			case 0x30000000://32-bit Greater Than
 			case 0x40000000://32-bit Less Than
 			case 0x50000000://32-bit Equal To
 			case 0x60000000://32-bit Not Equal To
-				Data = Read(Offset);
-				if (Type >= 0x70000000){
-					Data = (unsigned short)Data & ~Second8 >> 16;
-					Second8 = (unsigned short)Second8;
-				}
+				Data = Read(Offset, Mask);
 				Type &= 0x30000000;
 				if (Type == 0x30000000 && Second8 <= Data || Type == 0x00000000 && Second8 >= Data || Type == 0x10000000 && Second8 != Data || Type == 0x20000000 && Second8 == Data){
 					while (First8 != 0xD0000000 && First8 != 0xD2000000 && Index < WordCount){
 						First8 = arcode[Index++];
 						if ((First8 & 0xF0000000) == 0xE00000000){
-							Index += arcode[Index++] + 7 >> 3 << 1;
+							Index += (arcode[Index++] + 7) >> 3 << 1;
 							First8 = arcode[Index++];
 						}
 						Index++;
@@ -99,7 +90,7 @@ int uvl_entry(){
 				}
 				break;
 			case 0xB0000000://Load Offset
-				if ((CodeOffset = Read(Offset)) < CODE_OFFSET){
+				if ((CodeOffset = Read(Offset, Mask)) < CODE_OFFSET){
 					CodeOffset += CODE_OFFSET;
 				}
 				break;
@@ -135,25 +126,22 @@ int uvl_entry(){
 					case 0x05000000://Set Value
 						CodeData = Second8;
 						break;
-					case 0x06000000://32-Bit Incrementive Write
-						Write32(Offset, CodeData);
-						CodeOffset += 4;
-						break;
-					case 0x07000000://16-Bit Incrementive Write
-						Write16(Offset, CodeData);
-						CodeOffset += 2;
 					case 0x08000000://8-Bit Incrementive Write
-						Write8(Offset, CodeData);
-						CodeOffset++ ;
-						break;
-					case 0x09000000://32-Bit Load
-						CodeData = Read(Offset);
-						break;
-					case 0x0A000000://16-Bit Load
-						CodeData = (unsigned short)Read(Offset);
+						Mask >>= 8;
+						Increment >>= 1;
+					case 0x07000000://16-Bit Incrementive Write
+						Mask >>= 16;
+						Increment >>= 1;
+					case 0x06000000://32-Bit Incrementive Write
+						Write(Offset, CodeData, Mask);
+						CodeOffset += Increment;
 						break;
 					case 0x0B000000://8-Bit Load
-						CodeData = (unsigned char)Read(Offset);
+						Mask >>= 8;
+					case 0x0A000000://16-Bit Load
+						Mask >>= 16;
+					case 0x09000000://32-Bit Load
+						CodeData = Read(Offset, Mask);
 						break;
  					case 0x0C000000://Add Offset
 						CodeOffset += Second8;
@@ -163,51 +151,34 @@ int uvl_entry(){
 			case 0xE0000000://Patch Code
 				while (Second8 > 0 && Index < WordCount){
 					First8 = arcode[Index++];
-					if (Second8 >= 8){
-						Write32(Offset, First8);
-						Offset += 4;
-						Write32(Offset, arcode[Index++]);
-						Offset += 4;
-						Second8 -= 8;
-					}else{
-						if (Second8 >= 4){
-							Write32(Offset, First8);
-							Offset += 4;
-							Second8 -= 4;
-							First8 = arcode[Index];
-						}
-						Index++;
-						if (Second8 >= 2){
-							Write16(Offset, First8);
-							Offset += 2;
-							Second8 -= 2;
-							First8 >>= 16;
-						}
-						if (Second8 == 1){
-							Write8(Offset, First8);
-							Offset++;
-							Second8--;
-						}
+					if (Second8 >= 4){
+						Write(Offset, First8, Mask);
+						Offset += Increment;
+						Second8 -= Increment;
+						First8 = arcode[Index];
 					}
+					Index++;
+					if (Second8 < 4){
+						Increment = Second8;
+						Mask = ~(Mask << (Second8 << 3));
+					}
+					Write(Offset, First8, Mask);
+					Offset += Increment;
+					Second8 -= Increment;
 				}
 				break;
 			case 0xF0000000://Memory Copy Code
 				Offset = CODE_OFFSET + (First8 & 0x0FFFFFFF);
-				unsigned int tempoffset = CodeOffset;
-				while (Second8 >= 4){
-					Write32(Offset, Read(tempoffset));
-					tempoffset += 4;
-					Offset += 4;
-					Second8 -= 4;
-				}
-				if (Second8 >= 2){
-					Write16(Offset, Read(tempoffset));
-					tempoffset += 2;
-					Offset += 2;
-					Second8 -= 2;
-				}
-				if (Second8 == 1){
-					Write8(Offset, Read(tempoffset));
+				unsigned tempoffset = CodeOffset;
+				while (Second8 > 0){
+					if (Second8 < 4){
+						Increment = Second8;
+						Mask = ~(Mask << (Second8 << 3));
+					}
+					Write(Offset, Read(tempoffset, Mask), Mask);
+					tempoffset += Increment;
+					Offset += Increment;
+					Second8 -= Increment;
 				}
 			break;
 		}
