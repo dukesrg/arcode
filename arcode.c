@@ -1,4 +1,4 @@
-f#include "spider.h"
+#include "spider.h"
 #include "fs.h"
 
 #define BUFFER_LOC		0x18410000
