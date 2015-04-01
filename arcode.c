@@ -1,9 +1,14 @@
 #include "spider.h"
 #include "fs.h"
 
-#define BUFFER_LOC		0x18410000
 #define CODE_OFFSET		0x14000000
 #define ARCODE_POS		0x00000001
+#define MASK_32			0xFFFFFFFF 
+#define MASK_16			0x0000FFFF 
+#define MASK_8			0x000000FF 
+
+
+unsigned int *buf = (unsigned int *)0x18410000;
 
 void CopyMem(void *src, void *dst){
 	GSPGPU_FlushDataCache(src, 0x20);
@@ -12,18 +17,25 @@ void CopyMem(void *src, void *dst){
 	svcSleepThread(0x200000LL);
 }
 
-unsigned Read(unsigned Offset, unsigned Mask) 
-{ 
-	CopyMem((void*)Offset, (void*)BUFFER_LOC);
-	return *(unsigned*)(BUFFER_LOC + (Offset & 0x0000000F)) & Mask;
+unsigned Read(unsigned Offset, unsigned Mask){ 
+	unsigned int shift = Offset << 3 & 24; 
+	unsigned int offs = Offset >> 2 & 3; 
+	CopyMem((void *)Offset, buf); 
+	return (buf[offs] >> shift) | (buf[offs+1] << (32 - shift)) & Mask; 
 } 
 
-void Write(unsigned Offset, unsigned Data, unsigned Mask) 
-{ 
-	CopyMem((void*)Offset, (void*)BUFFER_LOC);
-	*(unsigned*)(BUFFER_LOC + (Offset & 0x0000000F)) &= ~Mask; 
-	*(unsigned*)(BUFFER_LOC + (Offset & 0x0000000F)) |= Data & Mask; 
-	CopyMem((void*)BUFFER_LOC, (void*)Offset); 
+void Write(unsigned Offset, unsigned Data, unsigned Mask){ 
+	unsigned shift = Offset << 3 & 24; 
+	unsigned offs = Offset >> 2 & 3; 
+	CopyMem((void *)Offset, buf); 
+	Data &= Mask; 
+	buf[offs] &= ~(Mask << shift); 
+	buf[offs] |= Data << shift; 
+	offs++; 
+	shift = 32 - shift; 
+	buf[offs] &= ~(Mask >> shift); 
+	buf[offs] |= Data >> shift; 
+	CopyMem(buf, (void *)Offset); 
 } 
 
 int uvl_entry(){
@@ -43,12 +55,11 @@ int uvl_entry(){
 	unsigned Increment;
 
 	WordCount = arcode[Index++] << 1;
-
 	while (Index < WordCount){
 		First8 = arcode[Index++];
 		Second8 = arcode[Index++];
 		Offset = CodeOffset + (First8 & 0x0FFFFFFF);
-		Mask = 0xFFFFFFFF;
+		Mask = MASK_32;
 		Increment = 4;
 		switch (Type = First8 & 0xF0000000){
 			case 0x20000000://8-bit Write
@@ -117,7 +128,7 @@ int uvl_entry(){
 						break;
 					case 0x03000000://Set Offset
 						if ((CodeOffset = Second8) < CODE_OFFSET){
-								CodeOffset += CODE_OFFSET;
+							CodeOffset += CODE_OFFSET;
 						}
 						break;
 					case 0x04000000://Add Value
@@ -148,39 +159,59 @@ int uvl_entry(){
 						break;
 				}
 				break;
-			case 0xE0000000://Patch Code
-				while (Second8 > 0 && Index < WordCount){
-					First8 = arcode[Index++];
-					if (Second8 >= 4){
-						Write(Offset, First8, Mask);
-						Offset += Increment;
-						Second8 -= Increment;
-						First8 = arcode[Index];
-					}
-					Index++;
-					if (Second8 < 4){
-						Increment = Second8;
-						Mask = ~(Mask << (Second8 << 3));
-					}
-					Write(Offset, First8, Mask);
-					Offset += Increment;
-					Second8 -= Increment;
-				}
-				break;
-			case 0xF0000000://Memory Copy Code
-				Offset = CODE_OFFSET + (First8 & 0x0FFFFFFF);
-				unsigned tempoffset = CodeOffset;
-				while (Second8 > 0){
-					if (Second8 < 4){
-						Increment = Second8;
-						Mask = ~(Mask << (Second8 << 3));
-					}
-					Write(Offset, Read(tempoffset, Mask), Mask);
-					tempoffset += Increment;
-					Offset += Increment;
-					Second8 -= Increment;
-				}
-			break;
+			case 0xE0000000://Patch Code 
+				Data = Second8; 
+				while (Data > 0 && Index < WordCount){ 
+					First8 = arcode[Index++]; 
+					Second8 = arcode[Index++]; 
+ 					if (Data >= 8){ 
+						Write(Offset, First8, MASK_32); 
+						Offset += 4; 
+						Write(Offset, Second8, MASK_32); 
+						Offset += 4; 
+						Data -= 8; 
+					}else{ 
+						if (Data >= 4){ 
+							Write(Offset, First8, MASK_32); 
+							Offset += 4; 
+							Data -= 4; 
+							First8 = Second8; 
+						} 
+						if (Data >= 2){ 
+							Write(Offset, First8, MASK_16); 
+							Offset += 2; 
+							Data -= 2; 
+							First8 >>= 16; 
+						} 
+						if (Data == 1){ 
+							Write(Offset, First8,  MASK_8); 
+							Data--; 
+						} 
+					} 
+				} 
+				break; 
+			case 0xF0000000://Memory Copy Code 
+				Offset = CODE_OFFSET + (First8 & 0x0FFFFFFF); 
+				unsigned tempoffset = CodeOffset; 
+				while (Second8 > 0){ 
+					if (Second8 >= 4){ 
+						Write(Offset, Read(tempoffset, MASK_32), MASK_32); 
+						tempoffset += 4; 
+						Offset += 4; 
+						Second8 -= 4; 
+					}else if (Second8 >= 2){ 
+						Write(Offset, Read(tempoffset, MASK_16) , MASK_16); 
+						tempoffset += 2; 
+						Offset += 2; 
+						Second8 -= 2; 
+					}else{ 
+						Write(Offset, Read(tempoffset, MASK_8), MASK_8); 
+						tempoffset += 1; 
+						Offset += 1; 
+						Second8 -= 1; 
+					} 
+				} 
+			break; 
 		}
 	}
 	return 0;
