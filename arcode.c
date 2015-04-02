@@ -98,15 +98,7 @@ int uvl_entry()
 						Index++;
 					}
 					if (First8 == 0xD2000000)
-					{
-						if (RepeatCount > 0)
-						{
-							RepeatCount--;
-							Index = ARCODE_POS + (RepeatStart << 1);
-						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0;
-					}
+						goto d2;
 				}
 				break;
 			case 0xB0000000://Load Offset
@@ -131,13 +123,14 @@ int uvl_entry()
 						}
 						break;
 					case 0x02000000://Loop Execute Variant / Full Terminator
-						if (RepeatCount > 0)
+d2:						if (RepeatCount > 0)
 						{
 							RepeatCount--;
 							Index = ARCODE_POS + (RepeatStart << 1);
+						} else {
+							CodeOffset = CODE_OFFSET;
+							CodeData = 0;
 						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0;
 						break;
 					case 0x03000000://Set Offset
 						if ((CodeOffset = Second8) < CODE_OFFSET){
