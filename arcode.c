@@ -98,7 +98,9 @@ int uvl_entry()
 						Index++;
 					}
 					if (First8 == 0xD2000000)
-						goto d2;
+					{
+						Index -= 2;
+					}
 				}
 				break;
 			case 0xB0000000://Load Offset
@@ -123,18 +125,20 @@ int uvl_entry()
 						}
 						break;
 					case 0x02000000://Loop Execute Variant / Full Terminator
-d2:						if (RepeatCount > 0)
+						if (RepeatCount > 0)
 						{
 							RepeatCount--;
 							Index = ARCODE_POS + (RepeatStart << 1);
-						} else {
+						}
+						else
+						{
 							CodeOffset = CODE_OFFSET;
 							CodeData = 0;
 						}
 						break;
 					case 0x03000000://Set Offset
 						if ((CodeOffset = Second8) < CODE_OFFSET){
-								CodeOffset += CODE_OFFSET;
+							CodeOffset += CODE_OFFSET;
 						}
 						break;
 					case 0x04000000://Add Value
