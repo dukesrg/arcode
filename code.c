@@ -12,6 +12,7 @@
 void Write32(unsigned int Offset, unsigned int Data);
 void Write16(unsigned int Offset, unsigned int Data);
 void Write8(unsigned int Offset, unsigned int Data);
+void WriteBack(unsigned int Offset);
 unsigned int Read32(unsigned int Offset);
 
 unsigned int *buf = (unsigned int *)0x18410000;
@@ -253,7 +254,8 @@ void CopyMem(void *src, void *dst, unsigned int size, unsigned long sleep){
 }
 
 void WriteBack(unsigned int Offset)
-	if((Offset < *(unsigned*)MEM_OFFS_REF || (Offset > *(unsigned*)MEM_OFFS_REF + BUF_SIZE - sizeof(unsigned))){ 
+{
+	if((Offset < *(unsigned*)MEM_OFFS_REF || (Offset > *(unsigned*)MEM_OFFS_REF + BUF_SIZE - sizeof(unsigned)))){ 
 		if(*(unsigned*)MEM_WRITE_REF == 1){ 
 			CopyMem(buf, (void *)(*(unsigned*)MEM_OFFS_REF), BUF_SIZE, SLEEP_DEFAULT); 
 			*(unsigned*)MEM_WRITE_REF = 0; 
@@ -271,7 +273,7 @@ void Write32(unsigned int Offset, unsigned int Data)
 	unsigned int mask = 0xFFFFFFFF << shift;
 	buf[offs] = (buf[offs] & ~mask) | ((Data << shift ) & mask);
 	buf[offs+1] = (buf[offs+1] & mask) | ((Data >> (0x20 - shift)) & ~mask);
-	MemWrite = 1;
+	*(unsigned*)MEM_WRITE_REF = 1;
 }
 
 void Write16(unsigned int Offset, unsigned int Data)
@@ -284,7 +286,7 @@ void Write16(unsigned int Offset, unsigned int Data)
 	unsigned int mask1 = (mask == 0xFF000000) ? 0x000000FF : 0x00000000;
 	buf[offs] = (buf[offs] & ~mask) | (Data << shift);
 	buf[offs+1] = (buf[offs+1] & ~mask1) | ((Data >> (0x20 - shift)) & mask1);
-	MemWrite = 1;
+	*(unsigned*)MEM_WRITE_REF = 1;
 }
 
 void Write8(unsigned int Offset, unsigned int Data)
@@ -293,7 +295,7 @@ void Write8(unsigned int Offset, unsigned int Data)
 	unsigned int offs = (Offset & ~(BUF_SIZE - 1)) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	buf[offs] = (buf[offs] & ~(0x000000FF << shift)) | ((Data & 0x000000FF) << shift);
-	MemWrite = 1;
+	*(unsigned*)MEM_WRITE_REF = 1;
 }
 
 unsigned int Read32(unsigned int Offset)
