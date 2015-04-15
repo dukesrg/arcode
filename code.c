@@ -4,11 +4,13 @@
 #define CODE_OFFSET	0x14000000
 #define ARCODE_POS	0x00000004
 #define BUF_SIZE	0x00000020
+#define MEM_OFFS_REF	0x18410000
+#define MEM_WRITE_REF	0x18410004
+#define SLEEP_DEFAULT	0x200000LL
 
 void Write32(unsigned int Offset, unsigned int Data);
 void Write16(unsigned int Offset, unsigned int Data);
 void Write8(unsigned int Offset, unsigned int Data);
-void WriteBack(unsigned int Offset);
 unsigned int Read32(unsigned int Offset);
 
 unsigned int *buf = (unsigned int *)0x18410000;
@@ -28,8 +30,6 @@ int uvl_entry()
 	unsigned int Data = 0;
 	unsigned int RepeatCount = 0;
 	unsigned int RepeatStart = 0;
-	unsigned int MemOffset = 0;
-	unsigned int MemWrite = 0;
 
 
 	IFile_Open(fin, L"dmc:/arcode.cht\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", FILE_R);
@@ -244,22 +244,22 @@ int uvl_entry()
 	return 0;
 }
 
-void CopyMem(void *src, void *dst, unsigned int size){
+void CopyMem(void *src, void *dst, unsigned int size, unsigned long sleep){
 	GSPGPU_FlushDataCache(src, size);
 	GX_SetTextureCopy(src, dst, size, 0, 0, 0, 0, 8);
 	GSPGPU_FlushDataCache(dst, size);
-	svcSleepThread(0x200000LL);
+	svcSleepThread(sleep);
 }
 
 void WriteBack(unsigned int Offset)
-	if((Offset < MemOffset) || (Offset > MemOffset + BUF_SIZE - sizeof(unsigned int))){
-		if(MemWrite == 1){
-			CopyMem(buf, (void *)(MemOffset), BUF_SIZE);
-			MemWrite = 0;
-		}
-		MemOffset = Offset & 0xFFFFFFF0;
-		CopyMem((void *)(MemOffset), buf, BUF_SIZE);
-	}
+	if((Offset < *(unsigned*)MEM_OFFS_REF || (Offset > *(unsigned*)MEM_OFFS_REF + BUF_SIZE - sizeof(unsigned))){ 
+		if(*(unsigned*)MEM_WRITE_REF == 1){ 
+			CopyMem(buf, (void *)(*(unsigned*)MEM_OFFS_REF), BUF_SIZE, SLEEP_DEFAULT); 
+			*(unsigned*)MEM_WRITE_REF = 0; 
+		} 
+		CopyMem((void*)Offset, buf, BUF_SIZE, SLEEP_DEFAULT); 
+		*(unsigned*)MEM_OFFS_REF = Offset & 0xFFFFFFF0;
+	} 
 }
 
 void Write32(unsigned int Offset, unsigned int Data)
