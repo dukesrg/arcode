@@ -91,14 +91,8 @@ int uvl_entry()
 
 					if (First8 == 0xD2000000)
 					{
-						if (RepeatCount > 0x00)
-						{
-							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							fin->pos = ARCODE_POS + (ProcessedLines << 3);
-						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
+						ProcessedLines--;
+						fin->pos = ARCODE_POS + (ProcessedLines << 3);
 					}
 				}
 				break;
@@ -129,8 +123,11 @@ int uvl_entry()
 							ProcessedLines = RepeatStart;
 							fin->pos = ARCODE_POS + (ProcessedLines << 3);
 						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
+						else
+						{
+							CodeOffset = CODE_OFFSET;
+							CodeData = 0x00;
+						}
 						break;
 					case 0x03000000://Set Offset
 						CodeOffset = Second8;
