@@ -32,7 +32,8 @@ int uvl_entry()
 	unsigned int Data = 0;
 	unsigned int RepeatCount = 0;
 	unsigned int RepeatStart = 0;
-
+	*(unsigned*)MEM_OFFS_REF = WRITE_BACK_ALL;
+	*(unsigned*)MEM_WRITE_REF = 0;
 
 	IFile_Open(fin, L"dmc:/arcode.cht\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", FILE_R);
 	fin->pos = 0x00;
@@ -242,7 +243,7 @@ int uvl_entry()
 			break;
 		}
 	}
-	WriteBack(WRITE_BACK_ALL);
+//	WriteBack(WRITE_BACK_ALL);
 	return 0;
 }
 
@@ -268,7 +269,7 @@ void WriteBack(unsigned int Offset)
 void Write32(unsigned int Offset, unsigned int Data)
 {
 	WriteBack(Offset);
-	unsigned int offs = (Offset & ~(BUF_SIZE - 1)) >> 2;
+	unsigned int offs = (Offset & (BUF_SIZE - 1)) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	unsigned int mask = 0xFFFFFFFF << shift;
 	buf[offs] = (buf[offs] & ~mask) | ((Data << shift ) & mask);
@@ -280,7 +281,7 @@ void Write16(unsigned int Offset, unsigned int Data)
 {
 	WriteBack(Offset);
 	Data &= 0x0000FFFF;
-	unsigned int offs = (Offset & ~(BUF_SIZE - 1)) >> 2;
+	unsigned int offs = (Offset & (BUF_SIZE - 1)) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	unsigned int mask = 0x0000FFFF << shift;
 	unsigned int mask1 = (mask == 0xFF000000) ? 0x000000FF : 0x00000000;
@@ -292,7 +293,7 @@ void Write16(unsigned int Offset, unsigned int Data)
 void Write8(unsigned int Offset, unsigned int Data)
 {
 	WriteBack(Offset);
-	unsigned int offs = (Offset & ~(BUF_SIZE - 1)) >> 2;
+	unsigned int offs = (Offset & (BUF_SIZE - 1)) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	buf[offs] = (buf[offs] & ~(0x000000FF << shift)) | ((Data & 0x000000FF) << shift);
 	*(unsigned*)MEM_WRITE_REF = 1;
@@ -301,7 +302,7 @@ void Write8(unsigned int Offset, unsigned int Data)
 unsigned int Read32(unsigned int Offset)
 {
 	WriteBack(Offset);
-	unsigned int offs = (Offset & ~(BUF_SIZE - 1)) >> 2;
+	unsigned int offs = (Offset & (BUF_SIZE - 1)) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	unsigned int mask = 0xFFFFFFFF >> shift;
 	return ((buf[offs] >> shift) & mask) | ((buf[offs+1] << (0x20 - shift)) & ~mask);
