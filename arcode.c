@@ -6,37 +6,48 @@
 #define MASK_32		0xFFFFFFFF
 #define MASK_16		0x0000FFFF
 #define MASK_8		0x000000FF
+#define BUF_SIZE	0x00000020
+#define MEM_OFFS_REF	0x18410000
+#define MEM_WRITE_REF	0x18410004
+#define SLEEP_DEFAULT	0x200000LL
 
-unsigned int *buf = (unsigned int *)0x18410000;
+unsigned int *buf = (unsigned int *)0x18410010;
 
-void CopyMem(void *src, void *dst){
-	GSPGPU_FlushDataCache(src, 0x20);
-	GX_SetTextureCopy(src, dst, 0x20, 0, 0, 0, 0, 8);
-	GSPGPU_FlushDataCache(dst, 0x20);
-	svcSleepThread(0x200000LL);
+void CopyMem(void *src, void *dst, unsigned size, unsigned long sleep){
+	GSPGPU_FlushDataCache(src, size);
+	GX_SetTextureCopy(src, dst, size, 0, 0, 0, 0, 8);
+	GSPGPU_FlushDataCache(dst, size);
+	if (sleep > 0)
+	{
+		svcSleepThread(sleep);
+	}
+}
+
+void WriteBack(unsigned Offset)
+{
+	if((Offset < *(unsigned*)MEM_OFFS_REF || (Offset > *(unsigned*)MEM_OFFS_REF + BUF_SIZE - sizeof(unsigned))){ 
+		if(*(unsigned*)MEM_WRITE_REF == 1){ 
+			CopyMem(buf, (void *)(*(unsigned*)MEM_OFFS_REF), BUF_SIZE, SLEEP_DEFAULT); 
+			*(unsigned*)MEM_WRITE_REF = 0; 
+		} 
+		CopyMem((void*)Offset, buf, BUF_SIZE, SLEEP_DEFAULT); 
+		*(unsigned*)MEM_OFFS_REF = Offset & 0xFFFFFFF0;
+	} 
 }
 
 unsigned int Read(unsigned int Offset, unsigned int Mask)
 {
-	unsigned int shift = Offset << 3 & 24;
-	unsigned int offs = Offset >> 2 & 3;
-	CopyMem((void *)Offset, buf);
-	return (buf[offs] >> shift) | (buf[offs+1] << (32 - shift)) & Mask;
+	WriteBack(Offset);
+	return *(unsigned*)(buf + (Offset & 0x0000000F)) & Mask;
 }
 
 void Write(unsigned int Offset, unsigned int Data, unsigned int Mask)
 {
-	unsigned int shift = Offset << 3 & 24;
-	unsigned int offs = Offset >> 2 & 3;
-	CopyMem((void *)Offset, buf);
-	Data &= Mask;
-	buf[offs] &= ~(Mask << shift);
-	buf[offs] |= Data << shift;
-	offs++;
-	shift = 32 - shift;
-	buf[offs] &= ~(Mask >> shift);
-	buf[offs] |= Data >> shift;
-	CopyMem(buf, (void *)Offset);
+	WriteBack(Offset);
+	unsigned int offs = Offset & 0x0000000F;
+	Data &= Mask; 
+	*(unsigned*)(BUFFER_LOC + offs) = *(unsigned*)(BUFFER_LOC + offs) & ~Mask | Data;
+	*(unsigned*)MEM_WRITE_REF = 1;
 }
 
 int uvl_entry()
