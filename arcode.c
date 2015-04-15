@@ -7,9 +7,10 @@
 #define MASK_16		0x0000FFFF
 #define MASK_8		0x000000FF
 #define BUF_SIZE	0x00000020
+#define SLEEP_DEFAULT	0x200000LL
 #define MEM_OFFS_REF	0x18410000
 #define MEM_WRITE_REF	0x18410004
-#define SLEEP_DEFAULT	0x200000LL
+#define WRITE_BACK_ALL	0xFFFFFFFF
 
 unsigned int *buf = (unsigned int *)0x18410010;
 
@@ -249,5 +250,6 @@ int uvl_entry()
 			break;
 		}
 	}
+	WriteBack(WRITE_BACK_ALL);
 	return 0;
 }
