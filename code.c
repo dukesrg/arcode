@@ -15,7 +15,7 @@ void Write8(unsigned int Offset, unsigned int Data);
 void WriteBack(unsigned int Offset);
 unsigned int Read32(unsigned int Offset);
 
-unsigned int *buf = (unsigned int *)0x18410000;
+unsigned int *buf = (unsigned int *)0x18410010;
 
 int uvl_entry()
 {
