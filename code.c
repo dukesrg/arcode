@@ -4,9 +4,10 @@
 #define CODE_OFFSET	0x14000000
 #define ARCODE_POS	0x00000004
 #define BUF_SIZE	0x00000020
+#define SLEEP_DEFAULT	0x200000LL
 #define MEM_OFFS_REF	0x18410000
 #define MEM_WRITE_REF	0x18410004
-#define SLEEP_DEFAULT	0x200000LL
+#define WRITE_BACK_ALL	0xFFFFFFFF
 
 void Write32(unsigned int Offset, unsigned int Data);
 void Write16(unsigned int Offset, unsigned int Data);
@@ -240,7 +241,7 @@ int uvl_entry()
 			break;
 		}
 	}
-
+	WriteBack(WRITE_BACK_ALL);
 	return 0;
 }
 
