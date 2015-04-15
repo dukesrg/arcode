@@ -8,6 +8,7 @@
 void Write32(unsigned int Offset, unsigned int Data);
 void Write16(unsigned int Offset, unsigned int Data);
 void Write8(unsigned int Offset, unsigned int Data);
+void WriteBack(unsigned int Offset);
 unsigned int Read32(unsigned int Offset);
 
 unsigned int *buf = (unsigned int *)0x18410000;
