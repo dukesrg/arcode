@@ -12,7 +12,7 @@
 void Write32(unsigned int Offset, unsigned int Data);
 void Write16(unsigned int Offset, unsigned int Data);
 void Write8(unsigned int Offset, unsigned int Data);
-void WriteBack(unsigned int Offset);
+unsigned WriteBack(unsigned int Offset);
 unsigned int Read32(unsigned int Offset);
 
 unsigned int *buf = (unsigned int *)0x18410010;
@@ -243,7 +243,7 @@ int uvl_entry()
 			break;
 		}
 	}
-//	WriteBack(WRITE_BACK_ALL);
+	WriteBack(WRITE_BACK_ALL);
 	return 0;
 }
 
@@ -254,22 +254,24 @@ void CopyMem(void *src, void *dst, unsigned int size, unsigned long sleep){
 	svcSleepThread(sleep);
 }
 
-void WriteBack(unsigned int Offset)
+unsigned WriteBack(unsigned int Offset)
 {
-	if((Offset < *(unsigned*)MEM_OFFS_REF) || (Offset > *(unsigned*)MEM_OFFS_REF + BUF_SIZE - sizeof(unsigned))){ 
+	if((*(unsigned*)MEM_OFFS_REF <= Offset) && (Offset <= *(unsigned*)MEM_OFFS_REF + BUF_SIZE - sizeof(unsigned))){
+		return Offset & (BUF_SIZE - 1);
+	}else{
 		if(*(unsigned*)MEM_WRITE_REF == 1){ 
 			CopyMem(buf, (void *)(*(unsigned*)MEM_OFFS_REF), BUF_SIZE, SLEEP_DEFAULT); 
 			*(unsigned*)MEM_WRITE_REF = 0; 
 		} 
 		CopyMem((void*)Offset, buf, BUF_SIZE, SLEEP_DEFAULT); 
 		*(unsigned*)MEM_OFFS_REF = Offset & 0xFFFFFFF0;
-	} 
+		return Offset | 0x0000000F;
+	}
 }
 
 void Write32(unsigned int Offset, unsigned int Data)
 {
-	WriteBack(Offset);
-	unsigned int offs = (Offset & (BUF_SIZE - 1)) >> 2;
+	unsigned int offs = WriteBack(Offset) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	unsigned int mask = 0xFFFFFFFF << shift;
 	buf[offs] = (buf[offs] & ~mask) | ((Data << shift ) & mask);
@@ -279,9 +281,8 @@ void Write32(unsigned int Offset, unsigned int Data)
 
 void Write16(unsigned int Offset, unsigned int Data)
 {
-	WriteBack(Offset);
 	Data &= 0x0000FFFF;
-	unsigned int offs = (Offset & (BUF_SIZE - 1)) >> 2;
+	unsigned int offs = WriteBack(Offset) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	unsigned int mask = 0x0000FFFF << shift;
 	unsigned int mask1 = (mask == 0xFF000000) ? 0x000000FF : 0x00000000;
@@ -292,8 +293,7 @@ void Write16(unsigned int Offset, unsigned int Data)
 
 void Write8(unsigned int Offset, unsigned int Data)
 {
-	WriteBack(Offset);
-	unsigned int offs = (Offset & (BUF_SIZE - 1)) >> 2;
+	unsigned int offs = WriteBack(Offset) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	buf[offs] = (buf[offs] & ~(0x000000FF << shift)) | ((Data & 0x000000FF) << shift);
 	*(unsigned*)MEM_WRITE_REF = 1;
@@ -301,8 +301,7 @@ void Write8(unsigned int Offset, unsigned int Data)
 
 unsigned int Read32(unsigned int Offset)
 {
-	WriteBack(Offset);
-	unsigned int offs = (Offset & (BUF_SIZE - 1)) >> 2;
+	unsigned int offs = WriteBack(Offset) >> 2;
 	unsigned int shift = (Offset & 0x03) << 3;
 	unsigned int mask = 0xFFFFFFFF >> shift;
 	return ((buf[offs] >> shift) & mask) | ((buf[offs+1] << (0x20 - shift)) & ~mask);
