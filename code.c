@@ -245,7 +245,7 @@ int uvl_entry()
 			break;
 		}
 	}
-	WriteBack(WRITE_BACK_ALL);
+	WriteBack(WRITE_BACK_ALL, 0);
 	return 0;
 }
 
