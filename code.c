@@ -268,7 +268,7 @@ unsigned WriteBack(unsigned int Offset, unsigned Size)
 		} 
 		CopyMem((void*)Offset, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
 		*(unsigned*)MEM_OFFS_REF = Offset & 0xFFFFFFF0;
-		return Offset | 0x0000000F;
+		return Offset & 0x0000000F;
 	}
 }
 
