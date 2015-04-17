@@ -286,7 +286,7 @@ void Write16(unsigned int Offset, unsigned short Data)
 
 void Write8(unsigned int Offset, unsigned char Data)
 {
-	*(unsigned char*)(buf + WriteBack(Offset, sizeof(Data))) = Data;
+	*(unsigned char*)(BUF_LOC + WriteBack(Offset, sizeof(Data))) = Data;
 	*(unsigned*)MEM_WRITE_REF = 1;
 }
 
