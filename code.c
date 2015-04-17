@@ -250,7 +250,7 @@ int uvl_entry()
 	return 0;
 }
 
-void CopyMem(void *src, void *dst, unsigned int size, unsigned long sleep){
+void CopyMem(void *src, void *dst, unsigned int size, unsigned long long sleep){
 	GSPGPU_FlushDataCache(src, size);
 	GX_SetTextureCopy(src, dst, size, 0, 0, 0, 0, 8);
 	GSPGPU_FlushDataCache(dst, size);
