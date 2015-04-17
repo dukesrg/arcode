@@ -18,7 +18,7 @@ unsigned Read32(unsigned int Offset);
 unsigned short Read16(unsigned int Offset);
 unsigned char Read8(unsigned int Offset);
 
-unsigned int *buf = (unsigned int *)BUF_LOC;
+unsigned int *buf = (unsigned int *)0x18410008;
 
 int uvl_entry()
 {
@@ -165,7 +165,7 @@ int uvl_entry()
 						CodeData = Read16(Offset);
 						break;
 					case 0x0B000000://8-Bit Load
-						CodeData = Read8(Offset)F;
+						CodeData = Read8(Offset);
 						break;
 					case 0x0C000000://Add Offset
 						CodeOffset += Second8;
