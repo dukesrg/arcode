@@ -1,54 +1,74 @@
 #include "spider.h"
 #include "fs.h"
+#ifdef print
+#include "print.h"
+#endif
 
 #define CODE_OFFSET	0x14000000
 #define ARCODE_POS	0x00000001
-#define MASK_32		0xFFFFFFFF
-#define MASK_16		0x0000FFFF
-#define MASK_8		0x000000FF
 #define BUF_SIZE	0x00000020
 #define SLEEP_DEFAULT	0x200000LL
 #define MEM_OFFS_REF	0x18410000
 #define MEM_WRITE_REF	0x18410004
+#define BUF_LOC		0x18410010
 #define WRITE_BACK_ALL	0xFFFFFFFF
 
-unsigned int *buf = (unsigned int *)0x18410010;
-
-void CopyMem(void *src, void *dst, unsigned size, unsigned long sleep){
+void CopyMem(void *src, void *dst, unsigned size, unsigned long long sleep){
 	GSPGPU_FlushDataCache(src, size);
 	GX_SetTextureCopy(src, dst, size, 0, 0, 0, 0, 8);
 	GSPGPU_FlushDataCache(dst, size);
-	if (sleep > 0)
-	{
-		svcSleepThread(sleep);
+	svcSleepThread(sleep);
+}
+
+void WriteBack(unsigned Offset, unsigned Size)
+{
+	if((Offset < *(unsigned*)MEM_OFFS_REF) || (*(unsigned*)MEM_OFFS_REF + BUF_SIZE - Size < Offset)){
+		if(*(unsigned*)MEM_WRITE_REF == 1){ 
+			CopyMem((void*)BUF_LOC, (void *)(*(unsigned*)MEM_OFFS_REF), BUF_SIZE, SLEEP_DEFAULT); 
+			*(unsigned*)MEM_WRITE_REF = 0; 
+		} 
+		CopyMem((void*)Offset, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
+		*(unsigned*)MEM_OFFS_REF = Offset & 0xFFFFFFF0;
 	}
 }
 
-void WriteBack(unsigned Offset)
+void Write32(unsigned Offset, unsigned Data)
 {
-	if((Offset < *(unsigned*)MEM_OFFS_REF || (Offset > *(unsigned*)MEM_OFFS_REF + BUF_SIZE - sizeof(unsigned))){ 
-		if(*(unsigned*)MEM_WRITE_REF == 1){ 
-			CopyMem(buf, (void *)(*(unsigned*)MEM_OFFS_REF), BUF_SIZE, SLEEP_DEFAULT); 
-			*(unsigned*)MEM_WRITE_REF = 0; 
-		} 
-		CopyMem((void*)Offset, buf, BUF_SIZE, SLEEP_DEFAULT); 
-		*(unsigned*)MEM_OFFS_REF = Offset & 0xFFFFFFF0;
-	} 
-}
-
-unsigned int Read(unsigned int Offset, unsigned int Mask)
-{
-	WriteBack(Offset);
-	return *(unsigned*)(buf + (Offset & 0x0000000F)) & Mask;
-}
-
-void Write(unsigned int Offset, unsigned int Data, unsigned int Mask)
-{
-	WriteBack(Offset);
-	unsigned int offs = Offset & 0x0000000F;
-	Data &= Mask; 
-	*(unsigned*)(BUFFER_LOC + offs) = *(unsigned*)(BUFFER_LOC + offs) & ~Mask | Data;
+	WriteBack(Offset, sizeof(Data));
+	*(unsigned*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF) = Data;
 	*(unsigned*)MEM_WRITE_REF = 1;
+}
+
+void Write16(unsigned int Offset, unsigned short Data)
+{
+	WriteBack(Offset, sizeof(Data));
+	*(unsigned short*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF) = Data;
+	*(unsigned*)MEM_WRITE_REF = 1;
+}
+
+void Write8(unsigned int Offset, unsigned char Data)
+{
+	WriteBack(Offset, sizeof(Data));
+	*(unsigned char*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF) = Data;
+	*(unsigned*)MEM_WRITE_REF = 1;
+}
+
+unsigned int Read32(unsigned int Offset)
+{
+	WriteBack(Offset, sizeof(unsigned));
+	return *(unsigned*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF);
+}
+
+unsigned short Read16(unsigned Offset)
+{
+	WriteBack(Offset, sizeof(unsigned short));
+	return *(unsigned short*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF);
+}
+
+unsigned char Read8(unsigned Offset)
+{
+	WriteBack(Offset, sizeof(unsigned char));
+	return *(unsigned char*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF);
 }
 
 int uvl_entry()
@@ -66,7 +86,6 @@ int uvl_entry()
 	unsigned int RepeatCount;
 	unsigned int RepeatStart;
 	unsigned int Mask;
-	unsigned int Increment;
 
 	WordCount = arcode[Index++] << 1;
 
@@ -74,17 +93,34 @@ int uvl_entry()
 	{
 		First8 = arcode[Index++];
 		Second8 = arcode[Index++];
+#ifdef print
+		print("\f\v", COLOR_TRANS, COLOR_TRANS);
+		print(" Code string:\r\n\n Code word 1:\r\n\n Code word 2:\r\n\n Offset value:\r\n\n Dx data value:\r\n\n Dx repeat value:", COLOR_FG_DEF, COLOR_BG_DEF);
+		print("\f\v\t\t\t", COLOR_TRANS, COLOR_TRANS);
+		printint(Index>>1, COLOR_FG_DEF, COLOR_BG_DEF);
+		print("\r\n\n\t\t\t", COLOR_TRANS, COLOR_TRANS);
+		printint(First8, COLOR_FG_DEF, COLOR_BG_DEF);
+		print("\r\n\n\t\t\t", COLOR_TRANS, COLOR_TRANS);
+		printint(Second8, COLOR_FG_DEF, COLOR_BG_DEF);
+		print("\r\n\n\t\t\t", COLOR_TRANS, COLOR_TRANS);
+		printint(Offset, COLOR_FG_DEF, COLOR_BG_DEF);
+		print("\r\n\n\t\t\t", COLOR_TRANS, COLOR_TRANS);
+		printint(Data, COLOR_FG_DEF, COLOR_BG_DEF);
+		print("\r\n\n\t\t\t", COLOR_TRANS, COLOR_TRANS);
+		printint(RepeatCount, COLOR_FG_DEF, COLOR_BG_DEF);
+#endif
 		Offset = CodeOffset + (First8 & 0x0FFFFFFF);
-		Mask = MASK_32;
-		Increment = 4;
+		Mask = 0xFFFFFFFF;
 		switch (Type = First8 & 0xF0000000)
 		{
-			case 0x20000000://8-bit Write
-				Mask >>= 8;
-			case 0x10000000://16-bit Write
-				Mask >>= 16;
 			case 0x00000000://32-bit Write
-				Write(Offset, Second8, Mask);
+				Write32(Offset, Second8);
+				break;
+			case 0x10000000://16-bit Write
+				Write8(Offset, Second8);
+				break;
+			case 0x20000000://8-bit Write
+				Write16(Offset, Second8);
 				break;
 			case 0x70000000://16-bit Greater Than
 			case 0x80000000://16-bit Less Than
@@ -97,7 +133,7 @@ int uvl_entry()
 			case 0x50000000://32-bit Equal To
 			case 0x60000000://32-bit Not Equal To
 				Type &= 0x30000000;
-				Data = Read(Offset, Mask);
+				Data = Read32(Offset) & Mask;
 				if (Type == 0x30000000 && Second8 <= Data || Type == 0x00000000 && Second8 >= Data || Type == 0x10000000 && Second8 != Data || Type == 0x20000000 && Second8 == Data)
 				{
 					while (First8 != 0xD0000000 && First8 != 0xD2000000 && Index < WordCount)
@@ -116,7 +152,7 @@ int uvl_entry()
 				}
 				break;
 			case 0xB0000000://Load Offset
-				if ((CodeOffset = Read(Offset, Mask)) < CODE_OFFSET)
+				if ((CodeOffset = Read32(Offset)) < CODE_OFFSET)
 				{
 					CodeOffset += CODE_OFFSET;
 				}
@@ -159,22 +195,26 @@ int uvl_entry()
 					case 0x05000000://Set Value
 						CodeData = Second8;
 						break;
-					case 0x08000000://8-Bit Incrementive Write
-						Mask >>= 8;
-						Increment >>= 1;
-					case 0x07000000://16-Bit Incrementive Write
-						Mask >>= 16;
-						Increment >>= 1;
 					case 0x06000000://32-Bit Incrementive Write
-						Write(Offset, CodeData, Mask);
-						CodeOffset += Increment;
+						Write32(Offset, CodeData);
+						CodeOffset += 4;
+						break;
+					case 0x07000000://16-Bit Incrementive Write
+						Write16(Offset, CodeData);
+						CodeOffset += 2;
+						break;
+					case 0x08000000://8-Bit Incrementive Write
+						Write8(Offset, CodeData);
+						CodeOffset++;
+						break;
+					case 0x09000000://32-Bit Load
+						CodeData = Read32(Offset);
+						break;
+					case 0x0A000000://16-Bit Load
+						CodeData = Read16(Offset);
 						break;
 					case 0x0B000000://8-Bit Load
-						Mask >>= 8;
-					case 0x0A000000://16-Bit Load
-						Mask >>= 16;
-					case 0x09000000://32-Bit Load
-						CodeData = Read(Offset, Mask);
+						CodeData = Read8(Offset);
 						break;
  					case 0x0C000000://Add Offset
 						CodeOffset += Second8;
@@ -190,9 +230,9 @@ int uvl_entry()
 
 					if (Data >= 8)//Double 32bit
 					{
-						Write(Offset, First8, MASK_32);
+						Write32(Offset, First8);
 						Offset += 4;
-						Write(Offset, Second8, MASK_32);
+						Write32(Offset, Second8);
 						Offset += 4;
 						Data -= 8;
 					}
@@ -200,21 +240,21 @@ int uvl_entry()
 					{
 						if (Data >= 4)//32bit
 						{
-							Write(Offset, First8, MASK_32);
+							Write32(Offset, First8);
 							Offset += 4;
 							Data -= 4;
 							First8 = Second8;
 						}
 						if (Data >= 2)//16bit
 						{
-							Write(Offset, First8, MASK_16);
+							Write16(Offset, First8);
 							Offset += 2;
 							Data -= 2;
 							First8 >>= 16;
 						}
 						if (Data == 1)//8bit
 						{
-							Write(Offset, First8,  MASK_8);
+							Write8(Offset, First8);
 							Data--;
 						}
 					}
@@ -227,21 +267,21 @@ int uvl_entry()
 				{
 					if (Second8 >= 4)//32bit
 					{
-						Write(Offset, Read(tempoffset, MASK_32), MASK_32);
+						Write32(Offset, Read32(tempoffset));
 						tempoffset += 4;
 						Offset += 4;
 						Second8 -= 4;
 					}
 					else if (Second8 >= 2)//16bit
 					{
-						Write(Offset, Read(tempoffset, MASK_16) , MASK_16);
+						Write16(Offset, Read16(tempoffset));
 						tempoffset += 2;
 						Offset += 2;
 						Second8 -= 2;
 					}
 					else//8bit
 					{
-						Write(Offset, Read(tempoffset, MASK_8), MASK_8);
+						Write8(Offset, Read8(tempoffset));
 						tempoffset += 1;
 						Offset += 1;
 						Second8 -= 1;
@@ -250,6 +290,9 @@ int uvl_entry()
 			break;
 		}
 	}
-	WriteBack(WRITE_BACK_ALL);
+	WriteBack(WRITE_BACK_ALL, 0);
+#ifdef print
+	print("\r\nDone!", COLOR_FG_DEF, COLOR_TRANS);
+#endif
 	return 0;
 }
