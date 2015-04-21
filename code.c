@@ -260,7 +260,7 @@ void CopyMem(void *src, void *dst, unsigned int size, unsigned long long sleep){
 unsigned WriteBack(unsigned int Offset, unsigned Size)
 {
 	if((*(unsigned*)MEM_OFFS_REF <= Offset) && (Offset <= *(unsigned*)MEM_OFFS_REF + BUF_SIZE - Size)){
-		return Offset & (BUF_SIZE - 1);
+		return Offset - *(unsigned*)MEM_OFFS_REF;
 	}else{
 		if(*(unsigned*)MEM_WRITE_REF == 1){ 
 			CopyMem((void*)BUF_LOC, (void *)(*(unsigned*)MEM_OFFS_REF), BUF_SIZE, SLEEP_DEFAULT); 
