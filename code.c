@@ -13,7 +13,7 @@
 void Write32(unsigned int Offset, unsigned Data);
 void Write16(unsigned int Offset, unsigned short Data);
 void Write8(unsigned int Offset, unsigned char Data);
-unsigned WriteBack(unsigned int Offset, unsigned Size);
+void WriteBack(unsigned int Offset, unsigned Size);
 unsigned Read32(unsigned int Offset);
 unsigned short Read16(unsigned int Offset);
 unsigned char Read8(unsigned int Offset);
@@ -257,50 +257,53 @@ void CopyMem(void *src, void *dst, unsigned int size, unsigned long long sleep){
 	svcSleepThread(sleep);
 }
 
-unsigned WriteBack(unsigned int Offset, unsigned Size)
+void WriteBack(unsigned int Offset, unsigned Size)
 {
-	if((*(unsigned*)MEM_OFFS_REF <= Offset) && (Offset <= *(unsigned*)MEM_OFFS_REF + BUF_SIZE - Size)){
-		return Offset - *(unsigned*)MEM_OFFS_REF;
-	}else{
+	if((Offset < *(unsigned*)MEM_OFFS_REF) || (*(unsigned*)MEM_OFFS_REF + BUF_SIZE - Size < Offset)){
 		if(*(unsigned*)MEM_WRITE_REF == 1){ 
 			CopyMem((void*)BUF_LOC, (void *)(*(unsigned*)MEM_OFFS_REF), BUF_SIZE, SLEEP_DEFAULT); 
 			*(unsigned*)MEM_WRITE_REF = 0; 
 		} 
 		CopyMem((void*)Offset, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
 		*(unsigned*)MEM_OFFS_REF = Offset & 0xFFFFFFF0;
-		return Offset & 0x0000000F;
 	}
 }
 
 void Write32(unsigned Offset, unsigned Data)
 {
-	*(unsigned*)(BUF_LOC + WriteBack(Offset, sizeof(Data))) = Data;
+	WriteBack(Offset, sizeof(Data));
+	*(unsigned*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF) = Data;
 	*(unsigned*)MEM_WRITE_REF = 1;
 }
 
 void Write16(unsigned int Offset, unsigned short Data)
 {
-	*(unsigned short*)(BUF_LOC + WriteBack(Offset, sizeof(Data))) = Data;
+	WriteBack(Offset, sizeof(Data));
+	*(unsigned short*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF) = Data;
 	*(unsigned*)MEM_WRITE_REF = 1;
 }
 
 void Write8(unsigned int Offset, unsigned char Data)
 {
-	*(unsigned char*)(BUF_LOC + WriteBack(Offset, sizeof(Data))) = Data;
+	WriteBack(Offset, sizeof(Data));
+	*(unsigned char*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF) = Data;
 	*(unsigned*)MEM_WRITE_REF = 1;
 }
 
 unsigned int Read32(unsigned int Offset)
 {
-	return *(unsigned*)(BUF_LOC + WriteBack(Offset, sizeof(unsigned)));
+	WriteBack(Offset, sizeof(unsigned));
+	return *(unsigned*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF);
 }
 
 unsigned short Read16(unsigned Offset)
 {
-	return *(unsigned short*)(BUF_LOC + WriteBack(Offset, sizeof(unsigned short)));
+	WriteBack(Offset, sizeof(unsigned short));
+	return *(unsigned short*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF);
 }
 
 unsigned char Read8(unsigned Offset)
 {
-	return *(unsigned char*)(BUF_LOC + WriteBack(Offset, sizeof(unsigned char)));
+	WriteBack(Offset, sizeof(unsigned char));
+	return *(unsigned char*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF);
 }
