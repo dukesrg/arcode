@@ -3,13 +3,22 @@
 
 #define CODE_OFFSET	0x14000000
 #define ARCODE_POS	0x00000004
+#define BUF_SIZE	0x00000800
+#define SLEEP_DEFAULT	0x200000LL
+#define MEM_OFFS_REF	0x18410000
+#define MEM_WRITE_REF	0x18410004
+#define BUF_LOC		0x18410010
+#define WRITE_BACK_ALL	0xFFFFFFFF
 
-void Write32(unsigned int Offset, unsigned int Data);
-void Write16(unsigned int Offset, unsigned int Data);
-void Write8(unsigned int Offset, unsigned int Data);
-unsigned int Read32(unsigned int Offset);
+void Write32(unsigned int Offset, unsigned Data);
+void Write16(unsigned int Offset, unsigned short Data);
+void Write8(unsigned int Offset, unsigned char Data);
+void WriteBack(unsigned int Offset, unsigned Size);
+unsigned Read32(unsigned int Offset);
+unsigned short Read16(unsigned int Offset);
+unsigned char Read8(unsigned int Offset);
 
-unsigned int *buf = (unsigned int *)0x18410000;
+unsigned int *buf = (unsigned int *)0x18410008;
 
 int uvl_entry()
 {
@@ -26,7 +35,8 @@ int uvl_entry()
 	unsigned int Data = 0;
 	unsigned int RepeatCount = 0;
 	unsigned int RepeatStart = 0;
-
+	*(unsigned*)MEM_OFFS_REF = WRITE_BACK_ALL;
+	*(unsigned*)MEM_WRITE_REF = 0;
 
 	IFile_Open(fin, L"dmc:/arcode.cht\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", FILE_R);
 	fin->pos = 0x00;
@@ -88,14 +98,8 @@ int uvl_entry()
 
 					if (First8 == 0xD2000000)
 					{
-						if (RepeatCount > 0x00)
-						{
-							RepeatCount--;
-							ProcessedLines = RepeatStart;
-							fin->pos = ARCODE_POS + (ProcessedLines << 3);
-						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
+						ProcessedLines--;
+						fin->pos = ARCODE_POS + (ProcessedLines << 3);
 					}
 				}
 				break;
@@ -126,8 +130,11 @@ int uvl_entry()
 							ProcessedLines = RepeatStart;
 							fin->pos = ARCODE_POS + (ProcessedLines << 3);
 						}
-						CodeOffset = CODE_OFFSET;
-						CodeData = 0x00;
+						else
+						{
+							CodeOffset = CODE_OFFSET;
+							CodeData = 0x00;
+						}
 						break;
 					case 0x03000000://Set Offset
 						CodeOffset = Second8;
@@ -155,10 +162,10 @@ int uvl_entry()
 						CodeData = Read32(Offset);
 						break;
 					case 0x0A000000://16-Bit Load
-						CodeData = Read32(Offset) & 0xFFFF;
+						CodeData = Read16(Offset);
 						break;
 					case 0x0B000000://8-Bit Load
-						CodeData = Read32(Offset) & 0xFF;
+						CodeData = Read8(Offset);
 						break;
 					case 0x0C000000://Add Offset
 						CodeOffset += Second8;
@@ -223,14 +230,14 @@ int uvl_entry()
 					}
 					else if (Second8 >= 0x02)//16bit
 					{
-						Write16(Offset, Read32(tempoffset) & 0xFFFF);
+						Write16(Offset, Read16(tempoffset));
 						tempoffset += 0x02;
 						Offset += 0x02;
 						Second8 -= 0x02;
 					}
 					else//8bit
 					{
-						Write8(Offset, Read32(tempoffset) & 0xFF);
+						Write8(Offset, Read8(tempoffset));
 						tempoffset += 0x01;
 						Offset += 0x01;
 						Second8 -= 0x01;
@@ -239,55 +246,64 @@ int uvl_entry()
 			break;
 		}
 	}
-
+	WriteBack(WRITE_BACK_ALL, 0);
 	return 0;
 }
 
-void CopyMem(void *src, void *dst){
-	GSPGPU_FlushDataCache(src, 0x20);
-	GX_SetTextureCopy(src, dst, 0x20, 0, 0, 0, 0, 8);
-	GSPGPU_FlushDataCache(dst, 0x20);
-	svcSleepThread(0x200000LL);
+void CopyMem(void *src, void *dst, unsigned int size, unsigned long long sleep){
+	GSPGPU_FlushDataCache(src, size);
+	GX_SetTextureCopy(src, dst, size, 0, 0, 0, 0, 8);
+	GSPGPU_FlushDataCache(dst, size);
+	svcSleepThread(sleep);
 }
 
-void Write32(unsigned int Offset, unsigned int Data)
+void WriteBack(unsigned int Offset, unsigned Size)
 {
-	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
-	unsigned int offs = (Offset & 0x0F) >> 2;
-	unsigned int shift = (Offset & 0x03) << 3;
-	unsigned int mask = 0xFFFFFFFF << shift;
-	buf[offs] = (buf[offs] & ~mask) | ((Data << shift ) & mask);
-	buf[offs+1] = (buf[offs+1] & mask) | ((Data >> (0x20 - shift)) & ~mask);
-	CopyMem(buf, (void *)(Offset & 0xFFFFFFF0));
+	if((Offset < *(unsigned*)MEM_OFFS_REF) || (*(unsigned*)MEM_OFFS_REF + BUF_SIZE - Size < Offset)){
+		if(*(unsigned*)MEM_WRITE_REF == 1){ 
+			CopyMem((void*)BUF_LOC, (void *)(*(unsigned*)MEM_OFFS_REF), BUF_SIZE, SLEEP_DEFAULT); 
+			*(unsigned*)MEM_WRITE_REF = 0; 
+		} 
+		CopyMem((void*)Offset, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
+		*(unsigned*)MEM_OFFS_REF = Offset & 0xFFFFFFF0;
+	}
 }
 
-void Write16(unsigned int Offset, unsigned int Data)
+void Write32(unsigned Offset, unsigned Data)
 {
-	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
-	Data &= 0x0000FFFF;
-	unsigned int offs = (Offset & 0x0F) >> 2;
-	unsigned int shift = (Offset & 0x03) << 3;
-	unsigned int mask = 0x0000FFFF << shift;
-	unsigned int mask1 = (mask == 0xFF000000) ? 0x000000FF : 0x00000000;
-	buf[offs] = (buf[offs] & ~mask) | (Data << shift);
-	buf[offs+1] = (buf[offs+1] & ~mask1) | ((Data >> (0x20 - shift)) & mask1);
-	CopyMem(buf, (void *)(Offset & 0xFFFFFFF0));
+	WriteBack(Offset, sizeof(Data));
+	*(unsigned*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF) = Data;
+	*(unsigned*)MEM_WRITE_REF = 1;
 }
 
-void Write8(unsigned int Offset, unsigned int Data)
+void Write16(unsigned int Offset, unsigned short Data)
 {
-	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
-	unsigned int offs = (Offset & 0x0F) >> 2;
-	unsigned int shift = (Offset & 0x03) << 3;
-	buf[offs] = (buf[offs] & ~(0x000000FF << shift)) | ((Data & 0x000000FF) << shift);
-	CopyMem(buf, (void *)(Offset & 0xFFFFFFF0));
+	WriteBack(Offset, sizeof(Data));
+	*(unsigned short*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF) = Data;
+	*(unsigned*)MEM_WRITE_REF = 1;
+}
+
+void Write8(unsigned int Offset, unsigned char Data)
+{
+	WriteBack(Offset, sizeof(Data));
+	*(unsigned char*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF) = Data;
+	*(unsigned*)MEM_WRITE_REF = 1;
 }
 
 unsigned int Read32(unsigned int Offset)
 {
-	CopyMem((void *)(Offset & 0xFFFFFFF0), buf);
-	unsigned int offs = (Offset & 0x0F) >> 2;
-	unsigned int shift = (Offset & 0x03) << 3;
-	unsigned int mask = 0xFFFFFFFF >> shift;
-	return ((buf[offs] >> shift) & mask) | ((buf[offs+1] << (0x20 - shift)) & ~mask);
+	WriteBack(Offset, sizeof(unsigned));
+	return *(unsigned*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF);
+}
+
+unsigned short Read16(unsigned Offset)
+{
+	WriteBack(Offset, sizeof(unsigned short));
+	return *(unsigned short*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF);
+}
+
+unsigned char Read8(unsigned Offset)
+{
+	WriteBack(Offset, sizeof(unsigned char));
+	return *(unsigned char*)(BUF_LOC + Offset - *(unsigned*)MEM_OFFS_REF);
 }
