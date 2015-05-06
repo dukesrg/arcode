@@ -7,9 +7,11 @@
 #define CODE_OFFSET	0x14000000
 #define ARCODE_POS	0x00000001
 #define BUF_SIZE	0x00000800
-#define SLEEP_DEFAULT	0x200000LL
+#define SLEEP_DEFAULT	0x000000LL
 #define MEM_OFFS_REF	0x18410000
 #define MEM_WRITE_REF	0x18410004
+#define BUF_RW_LEN	0x18410008
+#define FILE_HANDLE	0x1841000C
 #define BUF_LOC		0x18410010
 #define WRITE_BACK_ALL	0xFFFFFFFF
 
@@ -17,7 +19,9 @@ void CopyMem(void *src, void *dst, unsigned size, unsigned long long sleep){
 	GSPGPU_FlushDataCache(src, size);
 	GX_SetTextureCopy(src, dst, size, 0, 0, 0, 0, 8);
 	GSPGPU_FlushDataCache(dst, size);
-	svcSleepThread(sleep);
+	if(sleep > 0){
+		svcSleepThread(sleep);
+	}
 }
 
 void WriteBack(unsigned Offset, unsigned Size)
@@ -218,6 +222,30 @@ int uvl_entry()
 						break;
  					case 0x0C000000://Add Offset
 						CodeOffset += Second8;
+						break;
+ 					case 0x0D000000://Dump to file
+ 						WriteBack(WRITE_BACK_ALL, 0);
+						unsigned int tempoffset = CodeOffset + (short)(First8 & 0x000FFFFF);
+						IFile_Open(fin, &arcode[Index], FILE_W); 
+						Index += First8 >> 19 & 0x0000001E;
+						while (Second8 > 0){
+							CopyMem((void*)tempoffset, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
+							IFile_WRITE(FILE_HANDLE, BUF_RW_LEN, (unsigned*)(BUF_LOC + (tempoffset & 0x0000000F)), BUF_SIZE - (tempoffset & 0x0000000F));
+							Second8 -= BUF_SIZE - (tempoffset & 0x0000000F);
+						}
+						break;
+ 					case 0x0E000000://Patch from file
+ 						WriteBack(WRITE_BACK_ALL, 0);
+						unsigned int tempoffset = CodeOffset + (short)(First8 & 0x000FFFFF);
+						IFile_Open(fin, &arcode[Index], FILE_R); 
+						Index += First8 >> 19 & 0x0000001E;
+						do
+						{
+							CopyMem((void*)tempoffset, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
+							IFile_Read(FILE_HANDLE, BUF_RW_LEN, (unsigned*)(BUF_LOC + (tempoffset & 0x0000000F)), BUF_SIZE - (tempoffset & 0x0000000F));
+							CopyMem((void*)BUF_LOC, (void*)tempoffset, BUF_SIZE, SLEEP_DEFAULT); 
+						}
+						while (*(unsigned*)BUF_RW_LEN > 0);
 						break;
 				}
 				break;
