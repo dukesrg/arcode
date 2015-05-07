@@ -226,18 +226,18 @@ int uvl_entry()
  					case 0x0D000000://Dump to file
  						WriteBack(WRITE_BACK_ALL, 0);
 						unsigned int tempoffset = CodeOffset + (short)(First8 & 0x000FFFFF);
-						IFile_Open(fin, &arcode[Index], FILE_W); 
+						IFile_Open(FILE_HANDLE, &arcode[Index], FILE_W); 
 						Index += First8 >> 19 & 0x0000001E;
 						while (Second8 > 0){
 							CopyMem((void*)tempoffset, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
-							IFile_WRITE(FILE_HANDLE, BUF_RW_LEN, (unsigned*)(BUF_LOC + (tempoffset & 0x0000000F)), BUF_SIZE - (tempoffset & 0x0000000F));
+							IFile_Write(FILE_HANDLE, BUF_RW_LEN, (unsigned*)(BUF_LOC + (tempoffset & 0x0000000F)), BUF_SIZE - (tempoffset & 0x0000000F));
 							Second8 -= BUF_SIZE - (tempoffset & 0x0000000F);
 						}
 						break;
  					case 0x0E000000://Patch from file
  						WriteBack(WRITE_BACK_ALL, 0);
 						unsigned int tempoffset = CodeOffset + (short)(First8 & 0x000FFFFF);
-						IFile_Open(fin, &arcode[Index], FILE_R); 
+						IFile_Open(FILE_HANDLE, &arcode[Index], FILE_R); 
 						Index += First8 >> 19 & 0x0000001E;
 						do
 						{
