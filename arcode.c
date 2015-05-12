@@ -225,25 +225,28 @@ int uvl_entry()
 						break;
  					case 0x0D000000://Dump to file
  						WriteBack(WRITE_BACK_ALL, 0);
-						unsigned int tempoffset = CodeOffset + (short)(First8 & 0x000FFFFF);
 						IFile_Open(FILE_HANDLE, &arcode[Index], FILE_W); 
-						Index += First8 >> 19 & 0x0000001E;
-						while (Second8 > 0){
-							CopyMem((void*)tempoffset, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
-							IFile_Write(FILE_HANDLE, BUF_RW_LEN, (unsigned*)(BUF_LOC + (tempoffset & 0x0000000F)), BUF_SIZE - (tempoffset & 0x0000000F));
-							Second8 -= BUF_SIZE - (tempoffset & 0x0000000F);
+						Index += ((First8 >> 16 & 0x000000FF) + 7) >> 2 & 0x3E;
+						First8 = (First8 & 0x0000FFFF) * CodeData;
+						Second8 += CodeOffset;
+						while (First8 > 0){
+							CopyMem((void*)Second8, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
+							IFile_Write(FILE_HANDLE, BUF_RW_LEN, (unsigned*)(BUF_LOC + (Second8 & 0x0000000F)), BUF_SIZE - (Second8 & 0x0000000F));
+							First8 -= *(unsigned*)BUF_RW_LEN;
+							Second8 += *(unsigned*)BUF_RW_LEN;
 						}
 						break;
  					case 0x0E000000://Patch from file
  						WriteBack(WRITE_BACK_ALL, 0);
-						unsigned int tempoffset = CodeOffset + (short)(First8 & 0x000FFFFF);
 						IFile_Open(FILE_HANDLE, &arcode[Index], FILE_R); 
-						Index += First8 >> 19 & 0x0000001E;
+						Index += ((First8 >> 16 & 0x000000FF) + 7) >> 2 & 0x3E;
+						Second8 += CodeOffset;
 						do
 						{
-							CopyMem((void*)tempoffset, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
-							IFile_Read(FILE_HANDLE, BUF_RW_LEN, (unsigned*)(BUF_LOC + (tempoffset & 0x0000000F)), BUF_SIZE - (tempoffset & 0x0000000F));
-							CopyMem((void*)BUF_LOC, (void*)tempoffset, BUF_SIZE, SLEEP_DEFAULT); 
+							CopyMem((void*)Second8, (void*)BUF_LOC, BUF_SIZE, SLEEP_DEFAULT); 
+							IFile_Read(FILE_HANDLE, BUF_RW_LEN, (unsigned*)(BUF_LOC + (Second8 & 0x0000000F)), BUF_SIZE - (tempoffset & 0x0000000F));
+							CopyMem((void*)BUF_LOC, (void*)Second8, BUF_SIZE, SLEEP_DEFAULT); 
+							Second8 += *(unsigned*)BUF_RW_LEN;
 						}
 						while (*(unsigned*)BUF_RW_LEN > 0);
 						break;
