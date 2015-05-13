@@ -9,7 +9,7 @@
 #define MEM_WRITE_REF	0x18410004
 #define BUF_RW_LEN	0x18410008 
 #define FILE_HANDLE	0x1841000C 
-#define BUF_LOC		0x18410010
+#define BUF_LOC		0x18410020
 #define WRITE_BACK_ALL	0xFFFFFFFF
 
 void Write32(unsigned int Offset, unsigned Data);
@@ -20,7 +20,7 @@ unsigned Read32(unsigned int Offset);
 unsigned short Read16(unsigned int Offset);
 unsigned char Read8(unsigned int Offset);
 
-unsigned int *buf = (unsigned int *)0x18410008;
+unsigned int *buf = (unsigned int *)0x18410010;
 
 int uvl_entry()
 {
